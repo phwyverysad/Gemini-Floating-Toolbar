@@ -1,0 +1,19 @@
+<RCC>
+    <qresource prefix="/">
+        <file>qml/FloatingToolbar.qml</file>
+        <file>qml/SettingsDialog.qml</file>
+        <file>qml/SnippingOverlay.qml</file>
+        <file>qml/TrayMenuPopup.qml</file>
+        <file>qml/components/Theme.qml</file>
+        <file>qml/components/CustomButton.qml</file>
+        <file>qml/components/CustomComboBox.qml</file>
+        <file>qml/components/CustomCheckBox.qml</file>
+        <file>qml/components/CustomHotkeyBox.qml</file>
+        <file>qml/components/CustomPromptCard.qml</file>
+        <file>qml/components/CustomSlider.qml</file>
+        <file>qml/components/HotkeyRecorder.qml</file>
+        <file>qml/components/PromptEditorItem.qml</file>
+        <file>qml/components/PresetMenu.qml</file>
+        <file>qml/components/qmldir</file>
+    </qresource>
+</RCC>

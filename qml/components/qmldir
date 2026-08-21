@@ -1,0 +1,10 @@
+singleton Theme 1.0 Theme.qml
+CustomButton 1.0 CustomButton.qml
+CustomComboBox 1.0 CustomComboBox.qml
+CustomCheckBox 1.0 CustomCheckBox.qml
+CustomHotkeyBox 1.0 CustomHotkeyBox.qml
+CustomPromptCard 1.0 CustomPromptCard.qml
+CustomSlider 1.0 CustomSlider.qml
+HotkeyRecorder 1.0 HotkeyRecorder.qml
+PromptEditorItem 1.0 PromptEditorItem.qml
+PresetMenu 1.0 PresetMenu.qml

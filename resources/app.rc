@@ -1,0 +1,100 @@
+#include <windows.h>
+#include <commctrl.h>
+#include "resource.h"
+
+// Icon
+IDI_APP_ICON            ICON                    "app.ico"
+
+// Manifest
+1                       RT_MANIFEST             "app.manifest"
+
+// Version Information
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 1,0,0,0
+ PRODUCTVERSION 1,0,0,0
+ FILEFLAGSMASK 0x3fL
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS 0x40004L
+ FILETYPE 0x1L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName", "Antigravity Open Source"
+            VALUE "FileDescription", "Desktop Web Client for Gemini"
+            VALUE "FileVersion", "1.0.0.0"
+            VALUE "InternalName", "GeminiClient"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Antigravity Project"
+            VALUE "OriginalFilename", "Gemini.exe"
+            VALUE "ProductName", "Gemini Desktop Client"
+            VALUE "ProductVersion", "1.0.0.0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
+
+// Settings Dialog Template (Spacious layout with separate Image/Text prompt selector)
+IDD_SETTINGS_DIALOG DIALOGEX 0, 0, 440, 420
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Gemini Settings"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    // Language Selector Bar
+    RTEXT           "Language:", IDC_LBL_LANG, 14, 8, 90, 12
+    COMBOBOX        IDC_COMBO_LANG, 110, 6, 120, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+
+    // 1. Toggle Show/Hide Window (Boss Key)
+    LTEXT           "Toggle Window:", IDC_LBL_TOGGLE, 14, 24, 150, 12
+    EDITTEXT        IDC_HOTKEY_TOGGLE, 170, 22, 140, 14, ES_CENTER | ES_READONLY | WS_TABSTOP
+
+    // 2. Screenshot & Ask AI
+    LTEXT           "Capture Screen:", IDC_LBL_SCREENSHOT, 14, 42, 150, 12
+    EDITTEXT        IDC_HOTKEY_SCREENSHOT, 170, 40, 140, 14, ES_CENTER | ES_READONLY | WS_TABSTOP
+
+    // 3. Single Unified Quick-Ask Hotkey
+    LTEXT           "Quick Ask Hotkey:", IDC_LBL_QUICKASK, 14, 60, 150, 12
+    EDITTEXT        IDC_HOTKEY_QUICKASK, 170, 58, 140, 14, ES_CENTER | ES_READONLY | WS_TABSTOP
+
+    // Section Title & Category Selector
+    LTEXT           "Prompt Target:", IDC_LBL_PROMPT_CAT, 14, 80, 100, 12
+    COMBOBOX        IDC_COMBO_PROMPT_CAT, 120, 78, 200, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Prompt Templates:", IDC_LBL_PROMPTS_GROUP, 14, 98, 410, 10
+
+    // Action 1: คำตอบ (Answer)
+    LTEXT           "1. Answer:", IDC_LBL_ACTION_1, 14, 112, 410, 10
+    EDITTEXT        IDC_PROMPT_1, 14, 124, 412, 22, ES_MULTILINE | ES_AUTOVSCROLL | WS_VSCROLL | WS_TABSTOP
+
+    // Action 2: อธิบาย (Explain)
+    LTEXT           "2. Explain:", IDC_LBL_ACTION_2, 14, 150, 410, 10
+    EDITTEXT        IDC_PROMPT_2, 14, 162, 412, 22, ES_MULTILINE | ES_AUTOVSCROLL | WS_VSCROLL | WS_TABSTOP
+
+    // Action 3: สรุป (Summarize)
+    LTEXT           "3. Summarize:", IDC_LBL_ACTION_3, 14, 188, 410, 10
+    EDITTEXT        IDC_PROMPT_3, 14, 200, 412, 22, ES_MULTILINE | ES_AUTOVSCROLL | WS_VSCROLL | WS_TABSTOP
+
+    // Action 4: แปลภาษา (Translate)
+    LTEXT           "4. Translate:", IDC_LBL_ACTION_4, 14, 226, 410, 10
+    EDITTEXT        IDC_PROMPT_4, 14, 238, 412, 22, ES_MULTILINE | ES_AUTOVSCROLL | WS_VSCROLL | WS_TABSTOP
+
+    // Action 5: ข้อความ OCR / ขัดเกลา (Clean OCR / Polish)
+    LTEXT           "5. Action 5:", IDC_LBL_ACTION_5, 14, 264, 410, 10
+    EDITTEXT        IDC_PROMPT_5, 14, 276, 412, 22, ES_MULTILINE | ES_AUTOVSCROLL | WS_VSCROLL | WS_TABSTOP
+
+    // Options Checkboxes
+    AUTOCHECKBOX    "Automatically Run/Submit Prompt when Action is selected", IDC_CHECK_AUTORUN, 14, 306, 410, 12, WS_TABSTOP
+    AUTOCHECKBOX    "Start Google Gemini automatically when Windows starts", IDC_CHECK_STARTUP, 14, 322, 410, 12, WS_TABSTOP
+
+    // Dialog Buttons
+    PUSHBUTTON      "Reset Defaults", IDC_BTN_RESET_DEFAULTS, 14, 348, 95, 18, WS_TABSTOP
+    DEFPUSHBUTTON   "Save Settings", IDOK, 250, 348, 85, 18, WS_TABSTOP
+    PUSHBUTTON      "Cancel", IDCANCEL, 341, 348, 85, 18, WS_TABSTOP
+END

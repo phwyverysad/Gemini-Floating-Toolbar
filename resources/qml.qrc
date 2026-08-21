@@ -1,0 +1,13 @@
+<RCC>
+    <qresource prefix="/">
+        <file>../qml/FloatingToolbar.qml</file>
+        <file>../qml/SettingsDialog.qml</file>
+        <file>../qml/SnippingOverlay.qml</file>
+        <file>../qml/components/Theme.qml</file>
+        <file>../qml/components/CustomButton.qml</file>
+        <file>../qml/components/HotkeyRecorder.qml</file>
+        <file>../qml/components/PromptEditorItem.qml</file>
+        <file>../qml/components/PresetMenu.qml</file>
+        <file>../qml/components/qmldir</file>
+    </qresource>
+</RCC>
