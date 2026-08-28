@@ -1,0 +1,16 @@
+# GitHub Linguist Language Overrides
+
+# 1. Mark third-party SDK packages as vendored (excluded from language statistics)
+packages/** linguist-vendored
+
+# 2. Explicitly classify headers and source files as C++
+*.h linguist-language=C++
+*.hpp linguist-language=C++
+*.cpp linguist-language=C++
+src/** linguist-language=C++
+
+# 3. Classify QML & Resources
+*.qml linguist-language=QML
+*.qrc linguist-language=XML
+*.rc linguist-language=C++
+*.pro linguist-language=C++
