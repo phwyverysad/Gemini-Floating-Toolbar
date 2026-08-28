@@ -77,10 +77,13 @@ Item {
     // Floating Popup Menu
     Popup {
         id: popupMenu
+        x: 0
         y: root.height + 4
         width: root.width
         padding: 5
+        z: 9999
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        onOpened: root.isOpen = true
         onClosed: root.isOpen = false
 
         background: Rectangle {
@@ -88,6 +91,17 @@ Item {
             color: Theme.bgDialog
             border.color: Theme.borderLight
             border.width: 1
+
+            // Drop shadow
+            Rectangle {
+                anchors.fill: parent
+                anchors.margins: -1
+                radius: 9
+                color: "transparent"
+                border.color: "#20000000"
+                border.width: 1
+                z: -1
+            }
         }
 
         contentItem: ListView {
@@ -96,7 +110,7 @@ Item {
             model: root.model
 
             delegate: Rectangle {
-                width: parent ? parent.width : 260
+                width: ListView.view ? ListView.view.width : root.width - 10
                 height: 32
                 radius: 6
                 color: (index === root.currentIndex) 

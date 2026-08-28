@@ -64,7 +64,7 @@ Window {
 
         root.imagePromptsList = JSON.parse(JSON.stringify(cfg.imagePrompts || []));
         root.textPromptsList = JSON.parse(JSON.stringify(cfg.textPrompts || []));
-        if (root.textPromptsList.length === 5 && root.imagePromptsList.length >= 8) {
+        if (root.textPromptsList.length === 0) {
             root.textPromptsList = JSON.parse(JSON.stringify(root.imagePromptsList));
         }
         root.customAskPromptsList = JSON.parse(JSON.stringify(cfg.customAskPrompts || [
@@ -182,6 +182,7 @@ Window {
 
     function addCategory(name) {
         if (!name || name.trim().length === 0) return;
+        root.syncActiveCategoryPrompts();
         let id = "cat_" + Date.now();
         let list = JSON.parse(JSON.stringify(root.categoriesList));
         let defaultPrompt = [
@@ -203,6 +204,7 @@ Window {
 
     function deleteCategory(catId) {
         if (catId === "image" || catId === "text" || catId === "custom") return;
+        root.syncActiveCategoryPrompts();
         let list = JSON.parse(JSON.stringify(root.categoriesList));
         for (let i = 0; i < list.length; i++) {
             if (list[i].id === catId) {
@@ -221,7 +223,7 @@ Window {
 
         let cleanImage = root.sanitizePromptsList(root.imagePromptsList);
         let cleanText = root.sanitizePromptsList(root.textPromptsList);
-        if (cleanText.length === 5 && cleanImage.length >= 8) {
+        if (cleanText.length === 0) {
             cleanText = cleanImage;
         }
         let cleanCustomAsk = root.sanitizePromptsList(root.customAskPromptsList);
@@ -635,7 +637,7 @@ Window {
                     }
                 }
 
-                // Row: Screenshot Hotkey
+                // Row: Screenshot Hotkey & Capture Now Button
                 Row {
                     width: parent.width
                     Text {
@@ -647,14 +649,47 @@ Window {
                         color: Theme.textPrimary
                         anchors.verticalCenter: parent.verticalCenter
                     }
-                    CustomHotkeyBox {
-                        customWidth: 260
-                        customHeight: 32
-                        hotkeyText: root.snipHotkey.text || "Alt + Shift + S"
-                        modifiers: root.snipHotkey.mods || 5
-                        vkCode: root.snipHotkey.vk || 0x53
-                        onHotkeyChanged: function(txt, mods, vk) {
-                            root.snipHotkey = { text: txt, mods: mods, vk: vk };
+                    Row {
+                        spacing: 8
+                        anchors.verticalCenter: parent.verticalCenter
+                        CustomHotkeyBox {
+                            customWidth: 148
+                            customHeight: 32
+                            hotkeyText: root.snipHotkey.text || "Alt + Shift + S"
+                            modifiers: root.snipHotkey.mods || 5
+                            vkCode: root.snipHotkey.vk || 0x53
+                            onHotkeyChanged: function(txt, mods, vk) {
+                                root.snipHotkey = { text: txt, mods: mods, vk: vk };
+                            }
+                        }
+                        Rectangle {
+                            width: 104
+                            height: 32
+                            radius: 6
+                            color: snipNowMouse.containsMouse ? Theme.bgCardHover : Theme.bgInput
+                            border.color: snipNowMouse.containsMouse ? Theme.primary : Theme.borderLight
+                            border.width: 1
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: AppManager.isThai ? "แคปทันที" : "Capture Now"
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                                font.weight: Font.Normal
+                                color: Theme.primary
+                            }
+
+                            MouseArea {
+                                id: snipNowMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    root.animateClose();
+                                    AppManager.startSnipping();
+                                }
+                            }
                         }
                     }
                 }
@@ -850,7 +885,12 @@ Window {
                                             anchors.fill: parent
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
-                                            onClicked: root.activeCategoryId = modelData.id
+                                            onClicked: {
+                                                if (root.activeCategoryId !== modelData.id) {
+                                                    root.syncActiveCategoryPrompts();
+                                                    root.activeCategoryId = modelData.id;
+                                                }
+                                            }
                                         }
                                     }
                                 }

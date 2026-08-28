@@ -1,13 +1,16 @@
 <RCC>
     <qresource prefix="/">
-        <file>../qml/FloatingToolbar.qml</file>
-        <file>../qml/SettingsDialog.qml</file>
-        <file>../qml/SnippingOverlay.qml</file>
-        <file>../qml/components/Theme.qml</file>
-        <file>../qml/components/CustomButton.qml</file>
-        <file>../qml/components/HotkeyRecorder.qml</file>
-        <file>../qml/components/PromptEditorItem.qml</file>
-        <file>../qml/components/PresetMenu.qml</file>
-        <file>../qml/components/qmldir</file>
+        <file alias="qml/FloatingToolbar.qml">../qml/FloatingToolbar.qml</file>
+        <file alias="qml/SettingsDialog.qml">../qml/SettingsDialog.qml</file>
+        <file alias="qml/SnippingOverlay.qml">../qml/SnippingOverlay.qml</file>
+        <file alias="qml/components/Theme.qml">../qml/components/Theme.qml</file>
+        <file alias="qml/components/CustomButton.qml">../qml/components/CustomButton.qml</file>
+        <file alias="qml/components/CustomCheckBox.qml">../qml/components/CustomCheckBox.qml</file>
+        <file alias="qml/components/CustomComboBox.qml">../qml/components/CustomComboBox.qml</file>
+        <file alias="qml/components/CustomHotkeyBox.qml">../qml/components/CustomHotkeyBox.qml</file>
+        <file alias="qml/components/CustomPromptCard.qml">../qml/components/CustomPromptCard.qml</file>
+        <file alias="qml/components/CustomSlider.qml">../qml/components/CustomSlider.qml</file>
+        <file alias="qml/components/PresetMenu.qml">../qml/components/PresetMenu.qml</file>
+        <file alias="qml/components/qmldir">../qml/components/qmldir</file>
     </qresource>
 </RCC>

@@ -6,7 +6,7 @@ import "components"
 Window {
     id: root
 
-    flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool | Qt.NoFocus
+    flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
     color: "transparent"
     visible: false
 
@@ -21,6 +21,16 @@ Window {
     property string customQueryText: ""
     property int pendingPromptIndex: -1
     property bool isExiting: false
+    property bool wasActivated: false
+
+    onActiveChanged: {
+        if (active) {
+            wasActivated = true;
+        } else if (wasActivated && visible && !isExiting) {
+            AppManager.removeToolbarKeyboardHook();
+            root.animateHide();
+        }
+    }
 
     // Drag Handle Helper
     property point dragStartPoint: Qt.point(0, 0)
@@ -44,8 +54,21 @@ Window {
         function onRequestHideToolbar() {
             root.animateHide();
         }
+        function onRequestHideImmediateToolbar() {
+            root.hideImmediate();
+        }
         function onSettingsChanged() {
             root.reloadPrompts();
+        }
+        function onRequestTriggerToolbarAction(visualIndex) {
+            if (!root.isCustomAskMode && visualIndex >= 0 && visualIndex < root.activePrompts.length) {
+                root.triggerPromptWithAnim(visualIndex);
+            }
+        }
+        function onRequestOpenCustomAsk() {
+            if (!root.isCustomAskMode) {
+                root.openCustomAskMode();
+            }
         }
     }
 
@@ -54,7 +77,7 @@ Window {
         sequence: "Escape"
         onActivated: {
             if (root.isCustomAskMode) {
-                root.isCustomAskMode = false;
+                root.exitCustomAskMode();
             } else {
                 root.animateHide();
             }
@@ -139,7 +162,14 @@ Window {
     function openCustomAskMode() {
         root.isCustomAskMode = true;
         root.customQueryText = "";
+        AppManager.removeToolbarKeyboardHook();
+        root.requestActivate();
         customInput.forceActiveFocus();
+    }
+
+    function exitCustomAskMode() {
+        root.isCustomAskMode = false;
+        AppManager.installToolbarKeyboardHook(root.targetType);
     }
 
     function submitCustomAsk() {
@@ -147,20 +177,72 @@ Window {
         root.animateCustomSubmit(q);
     }
 
+    function hideImmediate() {
+        openAnim.stop();
+        closeAnim.stop();
+        triggerExitAnim.stop();
+        customSubmitExitAnim.stop();
+        mainContainer.opacity = 0.0;
+        mainContainer.scale = 0.88;
+        root.visible = false;
+        root.isExiting = false;
+        root.isCustomAskMode = false;
+        root.wasActivated = false;
+        AppManager.removeToolbarKeyboardHook();
+    }
+
     function showToolbar(type, x, y) {
+        openAnim.stop();
+        closeAnim.stop();
+        triggerExitAnim.stop();
+        customSubmitExitAnim.stop();
+
+        mainContainer.opacity = 0.0;
+        mainContainer.scale = 0.88;
+        root.visible = false;
+
         root.targetType = type || "image";
         root.anchorX = x;
         root.anchorY = y;
         root.isCustomAskMode = false;
         root.customQueryText = "";
         root.isExiting = false;
+        root.wasActivated = false;
         root.placementMode = AppManager.toolbarPlacement || "auto";
         root.cancelConfig = AppManager.cancelButton || { badge: "Esc", label: (AppManager.isThai ? "ยกเลิก" : "Cancel"), enabled: true };
         
         root.reloadPrompts();
 
-        let screenW = (Screen.desktopAvailableWidth > 0) ? Screen.desktopAvailableWidth : Screen.width;
-        let screenH = (Screen.desktopAvailableHeight > 0) ? Screen.desktopAvailableHeight : Screen.height;
+        // Multi-monitor screen detection with Qt 6 standard geometry
+        let targetScreen = null;
+        let screenList = Qt.application.screens;
+        if (screenList && screenList.length > 0) {
+            for (let i = 0; i < screenList.length; i++) {
+                let s = screenList[i];
+                let geo = s.virtualGeometry || s.geometry || Qt.rect(0, 0, s.width, s.height);
+                let sVx = geo.x;
+                let sVy = geo.y;
+                let sVw = geo.width;
+                let sVh = geo.height;
+                if (x >= sVx && x < (sVx + sVw) && y >= sVy && y < (sVy + sVh)) {
+                    targetScreen = s;
+                    break;
+                }
+            }
+        }
+        if (!targetScreen) {
+            targetScreen = Screen;
+        }
+
+        let targetGeo = targetScreen.virtualGeometry || targetScreen.geometry || Qt.rect(0, 0, targetScreen.width, targetScreen.height);
+        let sX = targetGeo.x;
+        let sY = targetGeo.y;
+        let screenW = targetGeo.width;
+        let screenH = targetGeo.height;
+        if (sX === 0 && sY === 0 && targetScreen.desktopAvailableWidth > 0 && targetScreen.desktopAvailableHeight > 0) {
+            screenW = targetScreen.desktopAvailableWidth;
+            screenH = targetScreen.desktopAvailableHeight;
+        }
         
         let promptCount = root.activePrompts.length;
         let estimatedW = Math.max(340, promptCount * 78 + 150);
@@ -168,16 +250,16 @@ Window {
         let actualH = root.barHeight + 32;
 
         if (root.placementMode === "center") {
-            root.x = Math.round((screenW - actualW) / 2);
-            root.y = Math.round((screenH - actualH) / 2);
+            root.x = Math.round(sX + (screenW - actualW) / 2);
+            root.y = Math.round(sY + (screenH - actualH) / 2);
         } else {
             let posX = Math.round(x - (actualW / 2));
             let posY = (type === "text") ? Math.round(y - actualH - 12) : Math.round(y + 12);
 
-            if (posY < 20) posY = Math.round(y + 24);
-            if (posY + actualH > screenH - 20) posY = screenH - actualH - 20;
-            if (posX < 20) posX = 20;
-            if (posX + actualW > screenW - 20) posX = screenW - actualW - 20;
+            if (posY < sY + 20) posY = Math.round(y + 24);
+            if (posY + actualH > sY + screenH - 20) posY = sY + screenH - actualH - 20;
+            if (posX < sX + 20) posX = sX + 20;
+            if (posX + actualW > sX + screenW - 20) posX = sX + screenW - actualW - 20;
 
             root.x = posX;
             root.y = posY;
@@ -185,11 +267,13 @@ Window {
 
         root.show();
         root.raise();
+        root.requestActivate();
         openAnim.restart();
     }
 
     function animateHide() {
         if (root.isExiting) return;
+        AppManager.removeToolbarKeyboardHook();
         root.isExiting = true;
         closeAnim.restart();
     }
@@ -339,7 +423,7 @@ Window {
         height: root.barHeight
         radius: 8
         clip: true
-        color: Theme.isDark ? "#f022242a" : "#fafeffff"
+        color: Theme.isDark ? "#f022242a" : "#ffffff"
         border.color: Theme.isDark ? "#353942" : "#e2e8f0"
         border.width: 1
 
@@ -464,8 +548,8 @@ Window {
                 width: customAskContent.implicitWidth + 14
                 height: root.btnHeight
                 radius: 6
-                color: customAskMouse.containsMouse ? (Theme.isDark ? "#223552" : "#ebf5ff") : (Theme.isDark ? "#1c2636" : "#f5f9ff")
-                border.color: customAskMouse.containsMouse ? "#2563eb" : (Theme.isDark ? "#2b4060" : "#dbeafe")
+                color: customAskMouse.containsMouse ? (Theme.isDark ? "#343844" : "#edf2f7") : "transparent"
+                border.color: customAskMouse.containsMouse ? (Theme.isDark ? "#484f5e" : "#cbd5e1") : "transparent"
                 border.width: 1
 
                 scale: customAskMouse.pressed ? 0.96 : (customAskMouse.containsMouse ? 1.02 : 1.0)
@@ -481,8 +565,8 @@ Window {
                         width: Math.max(root.badgeSize, customBadgeText.implicitWidth + 6)
                         height: root.badgeSize
                         radius: 4
-                        color: Theme.isDark ? "#1d3250" : "#dbeafe"
-                        border.color: Theme.isDark ? "#2563eb" : "#bfdbfe"
+                        color: Theme.isDark ? "#2b2f38" : "#f1f5f9"
+                        border.color: Theme.isDark ? "#3f4450" : "#e2e8f0"
                         border.width: 1
                         anchors.verticalCenter: parent.verticalCenter
 
@@ -493,7 +577,7 @@ Window {
                             font.family: Theme.fontFamily
                             font.pixelSize: root.badgeFontSize
                             font.weight: Font.Normal
-                            color: "#2563eb"
+                            color: Theme.textSecondary
                         }
                     }
 
@@ -502,7 +586,7 @@ Window {
                         font.family: Theme.fontFamily
                         font.pixelSize: root.fontSize
                         font.weight: Font.Normal
-                        color: customAskMouse.containsMouse ? "#1d4ed8" : "#2563eb"
+                        color: Theme.textPrimary
                         anchors.verticalCenter: parent.verticalCenter
                     }
                 }
@@ -645,7 +729,7 @@ Window {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: root.isCustomAskMode = false
+                    onClicked: root.exitCustomAskMode()
                 }
             }
 

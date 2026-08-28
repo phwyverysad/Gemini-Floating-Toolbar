@@ -18,6 +18,8 @@ public:
     void hide();
     void toggle();
     void restoreAndShow();
+    void close();
+    bool isVisible() const { return m_hWnd && IsWindowVisible(m_hWnd) && !IsIconic(m_hWnd); }
     HWND getHwnd() const { return m_hWnd; }
 
     void injectPromptAndImage(const QString& base64Image, const QString& promptText, bool autoRun);

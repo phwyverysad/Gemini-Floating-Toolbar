@@ -5,6 +5,12 @@ CONFIG -= embed_manifest_exe
 TARGET = Gemini
 TEMPLATE = app
 
+DESTDIR = $$PWD
+OBJECTS_DIR = $$PWD/obj
+MOC_DIR = $$PWD/moc
+RCC_DIR = $$PWD/rcc
+UI_DIR = $$PWD/uic
+
 DEFINES += UNICODE _UNICODE NDEBUG
 
 INCLUDEPATH += \
@@ -15,11 +21,12 @@ INCLUDEPATH += \
 LIBS += \
     -L$$PWD/packages/WebView2/build/native/x64 \
     -lWebView2LoaderStatic \
-    -lshell32 -luser32 -lgdi32 -ladvapi32 -lole32 -lshlwapi
+    -lshell32 -luser32 -lgdi32 -ladvapi32 -lole32 -loleaut32 -lshlwapi -ldwmapi
 
 HEADERS += \
     src/AppManager.h \
     src/WebViewWindow.h \
+    src/SnapshotImageProvider.h \
     resources/resource.h
 
 SOURCES += \
@@ -28,8 +35,9 @@ SOURCES += \
     src/WebViewWindow.cpp
 
 RESOURCES += \
-    qml.qrc
+    resources/qml.qrc
 
 RC_FILE = resources/app.rc
 
-QMAKE_LFLAGS += /SUBSYSTEM:WINDOWS /DEBUG /OPT:REF /OPT:ICF /DYNAMICBASE /NXCOMPAT /HIGHENTROPYVA
+QMAKE_CXXFLAGS += /guard:cf /utf-8
+QMAKE_LFLAGS += /SUBSYSTEM:WINDOWS /DYNAMICBASE /NXCOMPAT /HIGHENTROPYVA /OPT:REF /OPT:ICF /guard:cf

@@ -3,6 +3,8 @@
 #include <shlobj.h>
 #include <shlwapi.h>
 #include <sstream>
+#include <QJsonObject>
+#include <QJsonDocument>
 #include "WebViewWindow.h"
 #include "../resources/resource.h"
 
@@ -15,6 +17,16 @@ WebViewWindow::WebViewWindow() {
 }
 
 WebViewWindow::~WebViewWindow() {
+    close();
+}
+
+void WebViewWindow::close() {
+    if (m_webController) {
+        m_webController->Close();
+        m_webController = nullptr;
+    }
+    m_webView = nullptr;
+    m_webViewEnv = nullptr;
     if (m_hWnd) {
         DestroyWindow(m_hWnd);
         m_hWnd = nullptr;
@@ -121,10 +133,13 @@ void WebViewWindow::initWebView() {
                                                 if (m_webController) {
                                                     m_webController->MoveFocus(COREWEBVIEW2_MOVE_FOCUS_REASON_PROGRAMMATIC);
                                                 }
-                                                Sleep(30);
-                                                keybd_event(VK_RETURN, 0, 0, 0);
-                                                Sleep(15);
-                                                keybd_event(VK_RETURN, 0, KEYEVENTF_KEYUP, 0);
+                                                INPUT inputs[2] = {};
+                                                inputs[0].type = INPUT_KEYBOARD;
+                                                inputs[0].ki.wVk = VK_RETURN;
+                                                inputs[1].type = INPUT_KEYBOARD;
+                                                inputs[1].ki.wVk = VK_RETURN;
+                                                inputs[1].ki.dwFlags = KEYEVENTF_KEYUP;
+                                                SendInput(2, inputs, sizeof(INPUT));
                                             }
                                         }
                                         return S_OK;
@@ -188,49 +203,27 @@ void WebViewWindow::restoreAndShow() {
     }
 }
 
-static std::wstring EscapeJs(const std::wstring& input) {
-    std::wostringstream ss;
-    for (wchar_t c : input) {
-        switch (c) {
-        case L'\\': ss << L"\\\\"; break;
-        case L'"': ss << L"\\\""; break;
-        case L'/': ss << L"\\/"; break;
-        case L'\b': ss << L"\\b"; break;
-        case L'\f': ss << L"\\f"; break;
-        case L'\n': ss << L"\\n"; break;
-        case L'\r': ss << L"\\r"; break;
-        case L'\t': ss << L"\\t"; break;
-        default:
-            if (c >= 0 && c <= 0x1f) {
-                wchar_t buf[8];
-                swprintf_s(buf, L"\\u%04x", c);
-                ss << buf;
-            } else {
-                ss << c;
-            }
-            break;
-        }
-    }
-    return ss.str();
-}
-
 void WebViewWindow::injectPromptAndImage(const QString& base64Image, const QString& promptText, bool autoRun) {
     if (!m_webView) return;
 
     restoreAndShow();
 
-    std::wstring base64Str = base64Image.toStdWString();
-    std::wstring promptStr = EscapeJs(promptText.toStdWString());
-    std::wstring autoRunBoolStr = autoRun ? L"true" : L"false";
+    QJsonObject payloadObj;
+    payloadObj["base64"] = base64Image;
+    payloadObj["prompt"] = promptText;
+    payloadObj["autoRun"] = autoRun;
+    QString jsonStr = QString::fromUtf8(QJsonDocument(payloadObj).toJson(QJsonDocument::Compact));
+    std::wstring configJson = jsonStr.toStdWString();
 
     std::wstring jsCode = LR"JS(
 (function() {
     if (window.__lastInjectTime && (Date.now() - window.__lastInjectTime < 300)) return;
     window.__lastInjectTime = Date.now();
 
-    const base64Data = ")JS" + base64Str + LR"JS(";
-    const promptText = ")JS" + promptStr + LR"JS(";
-    const shouldSubmit = )JS" + autoRunBoolStr + LR"JS(;
+    const config = )JS" + configJson + LR"JS(;
+    const base64Data = config.base64 || "";
+    const promptText = config.prompt || "";
+    const shouldSubmit = !!config.autoRun;
     const uniqueFileName = 'screenshot_' + Date.now() + '.png';
 
     function base64ToFile(base64, filename) {
@@ -256,16 +249,26 @@ void WebViewWindow::injectPromptAndImage(const QString& base64Image, const QStri
 
     function findPromptInput() {
         const candidates = [
-            'textarea.textarea',
-            'textarea',
-            'div[contenteditable="true"]',
             'rich-textarea [contenteditable="true"]',
+            'div[contenteditable="true"]',
             'rich-textarea div p',
             '.ql-editor',
+            'div.ql-editor[contenteditable="true"]',
+            'div.ql-editor.textarea',
+            'textarea.textarea',
+            'textarea',
             '[role="textbox"]',
-            '[aria-label*="Prompt"]',
-            '[aria-label*="Type something"]',
-            '[placeholder*="Type something"]'
+            '[role="combobox"]',
+            '[aria-label*="Ask Gemini" i]',
+            '[aria-label*="ถาม Gemini" i]',
+            '[placeholder*="Ask Gemini" i]',
+            '[placeholder*="ถาม Gemini" i]',
+            '[aria-label*="Enter a prompt" i]',
+            '[aria-label*="ป้อนข้อความแจ้ง" i]',
+            '[aria-label*="ป้อนพรอมต์" i]',
+            '[aria-label*="Prompt" i]',
+            '[aria-label*="Type something" i]',
+            '[placeholder*="Type something" i]'
         ];
 
         for (const sel of candidates) {
@@ -403,8 +406,11 @@ void WebViewWindow::injectPromptAndImage(const QString& base64Image, const QStri
             'button[aria-label*="ส่งข้อความ" i]',
             'button[aria-label="Send" i]',
             'button[aria-label="ส่ง" i]',
+            'button[aria-label*="Submit" i]',
             'button[data-test-id="send-button"]',
             'button[data-test-id*="send"]',
+            'button[mattooltip*="Send" i]',
+            'button[mattooltip*="ส่ง" i]',
             '.send-button-container button',
             'button.chat-send-button'
         ];
@@ -423,6 +429,11 @@ void WebViewWindow::injectPromptAndImage(const QString& base64Image, const QStri
     }
 
     function pressEnterKey(inputEl) {
+        try {
+            if (window.chrome && window.chrome.webview && window.chrome.webview.postMessage) {
+                window.chrome.webview.postMessage("TRIGGER_ENTER_KEY");
+            }
+        } catch(e) {}
         if (!inputEl) return;
         try {
             const downEvt = new KeyboardEvent('keydown', {
@@ -453,7 +464,7 @@ void WebViewWindow::injectPromptAndImage(const QString& base64Image, const QStri
         if (!shouldSubmit) return;
 
         let pollCount = 0;
-        const maxPoll = 120; // 120 * 25ms = 3.0s
+        const maxPoll = hasFile ? 240 : 80; // 6.0s for image attachment, 2.0s for text
         let sent = false;
 
         function doSend() {
@@ -548,7 +559,7 @@ void WebViewWindow::injectPromptAndImage(const QString& base64Image, const QStri
         let attempts = 0;
         const retryTimer = setInterval(() => {
             attempts++;
-            if (performInjection() || attempts >= 20) {
+            if (performInjection() || attempts >= 45) {
                 clearInterval(retryTimer);
             }
         }, 80);

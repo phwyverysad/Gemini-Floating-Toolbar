@@ -2,6 +2,8 @@
 #include <windows.h>
 #include <shellapi.h>
 #include <QApplication>
+#include <QDir>
+#include <QFileInfo>
 #include <QQmlApplicationEngine>
 #include <QQmlComponent>
 #include <QQmlContext>
@@ -12,6 +14,7 @@
 #include <QDebug>
 #include "AppManager.h"
 #include "WebViewWindow.h"
+#include "SnapshotImageProvider.h"
 #include "../resources/resource.h"
 
 #define SINGLE_INSTANCE_MUTEX L"GoogleGeminiQtSingleInstanceMutex"
@@ -59,6 +62,13 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
+    // Explicitly configure Qt plugin library paths relative to executable
+    wchar_t exePathBuffer[MAX_PATH];
+    GetModuleFileNameW(nullptr, exePathBuffer, MAX_PATH);
+    QString appDirPath = QFileInfo(QString::fromWCharArray(exePathBuffer)).absolutePath();
+    QCoreApplication::addLibraryPath(appDirPath);
+    QCoreApplication::addLibraryPath(appDirPath + "/platforms");
+
     // 2. Initialize Qt Application
     QApplication app(argc, argv);
     app.setApplicationName("Google Gemini");
@@ -82,6 +92,7 @@ int main(int argc, char* argv[]) {
 
     // 5. Initialize QML Engine & Components
     QQmlApplicationEngine engine;
+    engine.addImageProvider("snapshot", SnapshotImageProvider::instance());
     engine.rootContext()->setContextProperty("AppManager", appManager);
     engine.addImportPath("qrc:/");
     engine.addImportPath("qrc:/qml");
@@ -107,19 +118,19 @@ int main(int argc, char* argv[]) {
 
     // Connect C++ AppManager Signals to QML Methods
     if (snippingOverlayObj) {
-        QObject::connect(appManager, &AppManager::requestShowSnipping, [snippingOverlayObj]() {
+        QObject::connect(appManager, &AppManager::requestShowSnipping, snippingOverlayObj, [snippingOverlayObj]() {
             QMetaObject::invokeMethod(snippingOverlayObj, "startSnipping");
         });
     }
 
     if (floatingToolbarObj) {
-        QObject::connect(appManager, &AppManager::requestShowToolbar, [floatingToolbarObj](const QString& type, int x, int y) {
+        QObject::connect(appManager, &AppManager::requestShowToolbar, floatingToolbarObj, [floatingToolbarObj](const QString& type, int x, int y) {
             QMetaObject::invokeMethod(floatingToolbarObj, "showToolbar", Q_ARG(QVariant, type), Q_ARG(QVariant, x), Q_ARG(QVariant, y));
         });
     }
 
     if (settingsDialogObj) {
-        QObject::connect(appManager, &AppManager::requestShowSettings, [settingsDialogObj]() {
+        QObject::connect(appManager, &AppManager::requestShowSettings, settingsDialogObj, [settingsDialogObj]() {
             QMetaObject::invokeMethod(settingsDialogObj, "openDialog");
         });
     }
@@ -151,6 +162,7 @@ int main(int argc, char* argv[]) {
 
             SetForegroundWindow(g_hHotkeyHelper);
             int cmd = TrackPopupMenu(hMenu, TPM_RETURNCMD | TPM_NONOTIFY | TPM_BOTTOMALIGN | TPM_LEFTALIGN, pt.x, pt.y, 0, g_hHotkeyHelper, nullptr);
+            PostMessage(g_hHotkeyHelper, WM_NULL, 0, 0);
             DestroyMenu(hMenu);
 
             switch (cmd) {
@@ -217,6 +229,7 @@ int main(int argc, char* argv[]) {
         g_hHotkeyHelper = nullptr;
     }
     if (hMutex) {
+        ReleaseMutex(hMutex);
         CloseHandle(hMutex);
     }
 

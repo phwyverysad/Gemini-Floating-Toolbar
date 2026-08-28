@@ -96,6 +96,48 @@ Item {
                     keyStr = "Tab";
                 } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                     keyStr = "Enter";
+                } else if (event.key === Qt.Key_QuoteLeft || event.key === Qt.Key_AsciiTilde) {
+                    keyStr = "`";
+                } else if (event.key === Qt.Key_Minus || event.key === Qt.Key_Underscore) {
+                    keyStr = "-";
+                } else if (event.key === Qt.Key_Equal || event.key === Qt.Key_Plus) {
+                    keyStr = "=";
+                } else if (event.key === Qt.Key_BracketLeft || event.key === Qt.Key_BraceLeft) {
+                    keyStr = "[";
+                } else if (event.key === Qt.Key_BracketRight || event.key === Qt.Key_BraceRight) {
+                    keyStr = "]";
+                } else if (event.key === Qt.Key_Backslash || event.key === Qt.Key_Bar) {
+                    keyStr = "\\";
+                } else if (event.key === Qt.Key_Semicolon || event.key === Qt.Key_Colon) {
+                    keyStr = ";";
+                } else if (event.key === Qt.Key_Apostrophe || event.key === Qt.Key_QuoteDbl) {
+                    keyStr = "'";
+                } else if (event.key === Qt.Key_Comma || event.key === Qt.Key_Less) {
+                    keyStr = ",";
+                } else if (event.key === Qt.Key_Period || event.key === Qt.Key_Greater) {
+                    keyStr = ".";
+                } else if (event.key === Qt.Key_Slash || event.key === Qt.Key_Question) {
+                    keyStr = "/";
+                } else if (event.key === Qt.Key_Insert) {
+                    keyStr = "Insert";
+                } else if (event.key === Qt.Key_Delete) {
+                    keyStr = "Delete";
+                } else if (event.key === Qt.Key_Home) {
+                    keyStr = "Home";
+                } else if (event.key === Qt.Key_End) {
+                    keyStr = "End";
+                } else if (event.key === Qt.Key_PageUp) {
+                    keyStr = "Page Up";
+                } else if (event.key === Qt.Key_PageDown) {
+                    keyStr = "Page Down";
+                } else if (event.key === Qt.Key_Up) {
+                    keyStr = "Up";
+                } else if (event.key === Qt.Key_Down) {
+                    keyStr = "Down";
+                } else if (event.key === Qt.Key_Left) {
+                    keyStr = "Left";
+                } else if (event.key === Qt.Key_Right) {
+                    keyStr = "Right";
                 }
 
                 if (keyStr.length > 0) {
