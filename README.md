@@ -13,17 +13,17 @@
 
 ---
 
-## ✨ ฟีเจอร์หลัก (Features)
+## ฟีเจอร์หลัก (Features)
 
-* 🎯 **แถบเครื่องมือลอยอัจฉริยะ (Floating Toolbar)**: เมนูลอยตามเคอร์เซอร์ พร้อมปุ่มคำสั่งด่วนและคีย์ลัด `1`-`9`, `?`, `Esc`
-* 📸 **แคปหน้าจอถาม AI (Screen Snipping & Image Ask)**: จับภาพหน้าจอได้ทุกมอนิเตอร์ รองรับ Freeform, ตรวจจับขอบเขตอัจฉริยะ (Smart Detect), และ Auto-Fit
-* 📝 **ครอบข้อความถามด่วน (Quick Text Ask)**: คลุมดำข้อความแล้วกดคีย์ลัดเพื่อส่งข้อความพร้อม Prompt เข้า Gemini ทันที
-* 🌐 **หน้าต่าง Gemini WebView2 ในตัว**: รันอินเทอร์เฟซ Google Gemini ผ่าน WebView2 เร็ว ปลอดภัย รองรับล็อกอิน Google
-* ⚙️ **การปรับแต่งครบครัน**: จัดการ Prompt, สร้างหมวดหมู่คำสั่ง, สลับภาษาไทย/อังกฤษ, ปรับขนาด/ตำแหน่ง Toolbar และตั้งเปิดพร้อม Windows
+* **แถบเครื่องมือลอยอัจฉริยะ (Floating Toolbar)**: เมนูลอยตามเคอร์เซอร์ พร้อมปุ่มคำสั่งด่วนและคีย์ลัด `1`-`9`, `?`, `Esc`
+* **แคปหน้าจอถาม AI (Screen Snipping & Image Ask)**: จับภาพหน้าจอได้ทุกมอนิเตอร์ รองรับ Freeform, ตรวจจับขอบเขตอัจฉริยะ (Smart Detect), และ Auto-Fit
+* **ครอบข้อความถามด่วน (Quick Text Ask)**: คลุมดำข้อความแล้วกดคีย์ลัดเพื่อส่งข้อความพร้อม Prompt เข้า Gemini ทันที
+* **หน้าต่าง Gemini WebView2 ในตัว**: รันอินเทอร์เฟซ Google Gemini ผ่าน WebView2 เร็ว ปลอดภัย รองรับล็อกอิน Google
+* **การปรับแต่งครบครัน**: จัดการ Prompt, สร้างหมวดหมู่คำสั่ง, สลับภาษาไทย/อังกฤษ, ปรับขนาด/ตำแหน่ง Toolbar และตั้งเปิดพร้อม Windows
 
 ---
 
-## ⌨️ คีย์ลัดเริ่มต้น (Default Hotkeys)
+## คีย์ลัดเริ่มต้น (Default Hotkeys)
 
 | คำสั่ง | คีย์ลัด | คำอธิบาย |
 | :--- | :--- | :--- |
@@ -33,18 +33,18 @@
 
 ---
 
-## 📥 ตัวเลือกการดาวน์โหลด (Downloads)
+## ตัวเลือกการดาวน์โหลด (Downloads)
 
 เลือกดาวน์โหลดรูปแบบที่ต้องการได้จาก [Releases](https://github.com/phwyverysad/Gemini-Floating-Toolbar/releases):
 
-1. **⭐ [ไฟล์เดียวจบ] Single-File Portable (`Gemini_Portable.exe`)**: ไฟล์ `.exe` เดียว พกพาไปใช้ได้ทุกเครื่องทันที ไม่ต้องติดตั้ง ไม่ต้องแตก ZIP
-2. **🌐 [ตัวติดตั้งออนไลน์] Web Installer (`Gemini_WebSetup.exe`)**: ขนาดเล็กพิเศษ (~2 MB) ติดตั้งลงใน `C:\Program Files\Google Gemini` และสร้างทางลัดหน้าจอ Desktop
-3. **💾 [ตัวติดตั้งออฟไลน์เต็ม] Offline Setup (`Gemini_Setup.exe`)**: ติดตั้งลงใน Program Files โดยไม่ต้องใช้อินเทอร์เน็ต
-4. **📁 [แบบพกพา ZIP] Portable Archive (`Gemini-Portable.zip`)**: โฟลเดอร์รวมไฟล์รันไทม์ครบชุด
+1. **[ไฟล์เดียวจบ] Single-File Portable (`Gemini_Portable.exe`)**: ไฟล์ `.exe` เดียว พกพาไปใช้ได้ทุกเครื่องทันที ไม่ต้องติดตั้ง ไม่ต้องแตก ZIP
+2. **[ตัวติดตั้งออนไลน์] Web Installer (`Gemini_WebSetup.exe`)**: ขนาดเล็กพิเศษ (~2 MB) ติดตั้งลงใน `C:\Program Files\Google Gemini` และสร้างทางลัดหน้าจอ Desktop
+3. **[ตัวติดตั้งออฟไลน์เต็ม] Offline Setup (`Gemini_Setup.exe`)**: ติดตั้งลงใน Program Files โดยไม่ต้องใช้อินเทอร์เน็ต
+4. **[แบบพกพา ZIP] Portable Archive (`Gemini-Portable.zip`)**: โฟลเดอร์รวมไฟล์รันไทม์ครบชุด
 
 ---
 
-## 🛠️ การคอมไพล์จาก Source Code (Build from Source)
+## การคอมไพล์จาก Source Code (Build from Source)
 
 ### สิ่งที่จำเป็น
 * Windows 10/11 (64-bit)
@@ -66,6 +66,6 @@ powershell -ExecutionPolicy Bypass -File package.ps1
 
 ---
 
-## 📄 สัญญาอนุญาต (License)
+## สัญญาอนุญาต (License)
 
 โปรเจกต์นี้เผยแพร่ภายใต้สัญญาอนุญาต [MIT License](LICENSE) - Copyright (c) 2026 phwyverysad
