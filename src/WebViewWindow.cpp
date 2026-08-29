@@ -441,6 +441,80 @@ void WebViewWindow::injectPromptAndImage(const QString& base64Image, const QStri
         } catch(e) {}
     }
 
+    function getRootInputContainer(el) {
+        if (!el) return document.body;
+        let cur = el.parentElement;
+        for (let i = 0; i < 10 && cur && cur !== document.body; i++) {
+            if (cur.querySelector('button') && (
+                cur.classList.contains('input-area-container') ||
+                cur.classList.contains('bottom-container') ||
+                cur.classList.contains('chat-input-container') ||
+                cur.tagName === 'FORM' ||
+                cur.tagName === 'MAIN'
+            )) {
+                return cur;
+            }
+            cur = cur.parentElement;
+        }
+        return el.closest('.input-area-container, .bottom-container, .chat-input-container, form, main') || el.parentElement || document.body;
+    }
+
+    function getAttachmentCards(rootContainer) {
+        if (!rootContainer) return [];
+        const selectors = [
+            '.attachment-card',
+            '.attachment-container',
+            '.image-preview',
+            '.uploader-preview',
+            'rich-textarea-attachment-container',
+            'img[src^="blob:"]',
+            'img[src^="data:image"]',
+            '[aria-label*="Remove image" i]',
+            '[aria-label*="Delete image" i]',
+            '[aria-label*="ลบรูปภาพ" i]',
+            '[aria-label*="Remove file" i]',
+            '[aria-label*="Delete file" i]',
+            'button[mattooltip*="Delete" i]',
+            'button[mattooltip*="Remove" i]',
+            'button[mattooltip*="ลบ" i]',
+            'mat-chip[role="option"]',
+            '.file-bubble'
+        ];
+        const results = [];
+        for (const sel of selectors) {
+            const list = Array.from(rootContainer.querySelectorAll(sel));
+            for (const item of list) {
+                if (item.offsetParent !== null && !results.includes(item)) {
+                    results.push(item);
+                }
+            }
+        }
+        return results;
+    }
+
+    function isUploadInProgress(rootContainer) {
+        if (!rootContainer) return false;
+        const spinnerSelectors = [
+            'mat-progress-spinner',
+            'mat-spinner',
+            '.mat-mdc-progress-spinner',
+            '.attachment-card .loading',
+            '.attachment-card .uploading',
+            '.image-preview .loading',
+            '.image-preview .uploading',
+            '.uploader-preview .loading',
+            '.spinner',
+            '[role="progressbar"]'
+        ];
+        for (const sel of spinnerSelectors) {
+            const spinners = Array.from(rootContainer.querySelectorAll(sel));
+            if (spinners.some(s => s.offsetParent !== null)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     function performInjection() {
         const el = findPromptInput();
         if (!el) return false;
@@ -448,41 +522,42 @@ void WebViewWindow::injectPromptAndImage(const QString& base64Image, const QStri
         el.focus();
 
         const file = (base64Data && base64Data.length > 10) ? base64ToFile(base64Data, uniqueFileName) : null;
-
-        // Traverse up to find the root input area container that holds both textarea, image previews, and send button
-        let rootContainer = el.parentElement;
-        for (let i = 0; i < 8 && rootContainer && rootContainer !== document.body; i++) {
-            if (rootContainer.querySelector('button') && (rootContainer.classList.contains('input-area-container') || rootContainer.classList.contains('bottom-container') || rootContainer.classList.contains('chat-input-container') || rootContainer.tagName === 'FORM')) {
-                break;
-            }
-            rootContainer = rootContainer.parentElement;
-        }
-        if (!rootContainer) rootContainer = document.body;
+        const rootContainer = getRootInputContainer(el);
 
         if (file) {
+            // Count initial cards strictly before attach
+            const initialCardCount = getAttachmentCards(rootContainer).length;
             const attachStartTime = Date.now();
+            let attachAttempt = 1;
 
-            // 1. Attach the image file FIRST
+            // 1. Dispatch Image Attachment FIRST
             attachImage(file, el);
 
-            // 2. Inject prompt text
-            injectText(el, promptText);
-
-            if (!shouldSubmit) return true;
-
-            // 3. Strict Sequential Submit
-            let pollCount = 0;
-            const maxPoll = 240; // 6.0 seconds maximum
-            let sent = false;
-
-            function isUploadingActive() {
-                const spinners = rootContainer.querySelectorAll('mat-progress-spinner, mat-spinner, .mat-mdc-progress-spinner, .loading, .uploading, [role="progressbar"]');
-                return Array.from(spinners).some(s => s.offsetParent !== null);
+            if (!shouldSubmit) {
+                // If not auto-run, simply inject prompt text and let user submit manually
+                injectText(el, promptText);
+                return true;
             }
+
+            // 2. Strict State Machine for Simultaneous Submission
+            // State 0: WAITING_FOR_CARD (Must see new attachment card in DOM)
+            // State 1: WAITING_FOR_UPLOAD (Card seen, waiting for progress spinners to finish)
+            // State 2: READY_TO_SEND (Card confirmed, no spinners, send button enabled)
+            let state = 0; 
+            let pollCount = 0;
+            const maxPoll = 400; // 10.0 seconds maximum
+            let sent = false;
 
             function doSendNow() {
                 if (sent) return true;
                 sent = true;
+
+                // Ensure prompt text is firmly in the input field before clicking send
+                const currentText = el.innerText || el.value || '';
+                if (promptText && !currentText.includes(promptText.trim())) {
+                    injectText(el, promptText);
+                }
+
                 const runBtn = findSendButton(el);
                 if (runBtn) {
                     runBtn.click();
@@ -493,30 +568,53 @@ void WebViewWindow::injectPromptAndImage(const QString& base64Image, const QStri
                 return true;
             }
 
-            function checkCanSend() {
+            function stepStateMachine() {
                 if (sent) return true;
+
                 const elapsed = Date.now() - attachStartTime;
+                const cards = getAttachmentCards(rootContainer);
+                const hasNewCard = (cards.length > initialCardCount) || (cards.length > 0 && elapsed > 250);
+                const uploading = isUploadInProgress(rootContainer);
 
-                // Enforce minimum 300ms wait for paste event to dispatch and render
-                if (elapsed < 300) return false;
-
-                // If upload spinner is actively visible, keep waiting
-                if (isUploadingActive()) return false;
-
-                // Check if Send button is found and enabled
-                const runBtn = findSendButton(el);
-                if (runBtn) {
-                    // Double check prompt text is still present
-                    const currentText = el.innerText || el.value || '';
-                    if (promptText && !currentText.includes(promptText.trim())) {
-                        injectText(el, promptText);
-                    }
-                    return doSendNow();
+                // Retry paste if no card seen after 800ms
+                if (state === 0 && !hasNewCard && elapsed > 800 * attachAttempt && attachAttempt < 3) {
+                    attachAttempt++;
+                    attachImage(file, el);
                 }
 
-                // If after 1.5s the upload has no spinners, try sending via Enter
-                if (elapsed >= 1500 && !isUploadingActive()) {
-                    return doSendNow();
+                if (state === 0) {
+                    if (hasNewCard) {
+                        state = 1; // Card confirmed! Transition to checking upload progress
+                        // Inject the prompt text now that the card is mounting
+                        injectText(el, promptText);
+                    } else {
+                        // STRICT RULE: DO NOT SEND! We MUST NOT submit if the image hasn't even mounted!
+                        return false;
+                    }
+                }
+
+                if (state === 1) {
+                    if (uploading) {
+                        // Still uploading bytes, stay in state 1
+                        return false;
+                    } else {
+                        // Upload spinner has disappeared! Make sure prompt text is injected
+                        injectText(el, promptText);
+                        state = 2; // Ready to check send button
+                    }
+                }
+
+                if (state === 2) {
+                    // Check if send button is enabled
+                    const runBtn = findSendButton(el);
+                    const isBtnEnabled = runBtn && !runBtn.disabled && runBtn.getAttribute('aria-disabled') !== 'true';
+
+                    if (isBtnEnabled) {
+                        return doSendNow();
+                    } else if (elapsed > 1200 && !uploading) {
+                        // Button might not use standard attributes or Enter key will submit
+                        return doSendNow();
+                    }
                 }
 
                 return false;
@@ -525,11 +623,15 @@ void WebViewWindow::injectPromptAndImage(const QString& base64Image, const QStri
             // High-frequency 25ms polling
             const pollTimer = setInterval(() => {
                 pollCount++;
-                if (checkCanSend() || pollCount >= maxPoll) {
+                if (stepStateMachine() || pollCount >= maxPoll) {
                     clearInterval(pollTimer);
                     if (observer) observer.disconnect();
+
                     if (!sent && pollCount >= maxPoll) {
-                        doSendNow();
+                        // Only submit on timeout if image card was confirmed and not uploading
+                        if (state >= 1 && !isUploadInProgress(rootContainer)) {
+                            doSendNow();
+                        }
                     }
                 }
             }, 25);
@@ -538,7 +640,7 @@ void WebViewWindow::injectPromptAndImage(const QString& base64Image, const QStri
             let observer = null;
             try {
                 observer = new MutationObserver(() => {
-                    if (checkCanSend()) {
+                    if (stepStateMachine()) {
                         clearInterval(pollTimer);
                         observer.disconnect();
                     }
