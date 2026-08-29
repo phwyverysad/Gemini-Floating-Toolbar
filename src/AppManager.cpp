@@ -383,16 +383,6 @@ void AppManager::handleGlobalHotkey(int hotkeyId) {
 }
 
 QRect AppManager::getVirtualDesktopGeometry() {
-    QList<QScreen*> screens = QGuiApplication::screens();
-    if (!screens.isEmpty()) {
-        QRect virtualGeo;
-        for (QScreen* s : screens) {
-            virtualGeo = virtualGeo.united(s->geometry());
-        }
-        if (virtualGeo.width() > 50 && virtualGeo.height() > 50) {
-            return virtualGeo;
-        }
-    }
     int vx = GetSystemMetrics(SM_XVIRTUALSCREEN);
     int vy = GetSystemMetrics(SM_YVIRTUALSCREEN);
     int vw = GetSystemMetrics(SM_CXVIRTUALSCREEN);
@@ -407,36 +397,6 @@ QRect AppManager::getVirtualDesktopGeometry() {
 }
 
 QPixmap AppManager::captureNativeDesktop() {
-    // 1. Primary: Qt Screen grabWindow across all active displays
-    QList<QScreen*> screens = QGuiApplication::screens();
-    if (!screens.isEmpty()) {
-        if (screens.size() == 1) {
-            QPixmap pix = screens.first()->grabWindow(0);
-            if (!pix.isNull() && pix.width() > 50 && pix.height() > 50) {
-                return pix;
-            }
-        } else {
-            QRect virtualGeo = getVirtualDesktopGeometry();
-            if (virtualGeo.width() > 50 && virtualGeo.height() > 50) {
-                QImage compositeImage(virtualGeo.size(), QImage::Format_RGB32);
-                compositeImage.fill(Qt::black);
-                QPainter painter(&compositeImage);
-                for (QScreen* s : screens) {
-                    QPixmap screenPix = s->grabWindow(0);
-                    int targetX = s->geometry().x() - virtualGeo.x();
-                    int targetY = s->geometry().y() - virtualGeo.y();
-                    painter.drawPixmap(targetX, targetY, s->geometry().width(), s->geometry().height(), screenPix);
-                }
-                painter.end();
-                QPixmap compPix = QPixmap::fromImage(compositeImage);
-                if (!compPix.isNull() && compPix.width() > 50 && compPix.height() > 50) {
-                    return compPix;
-                }
-            }
-        }
-    }
-
-    // 2. Fallback: Native GDI desktop capture
     QRect vGeo = getVirtualDesktopGeometry();
     int vx = vGeo.x();
     int vy = vGeo.y();
@@ -472,7 +432,7 @@ QPixmap AppManager::captureNativeDesktop() {
     bi.bmiHeader.biCompression = BI_RGB;
 
     QImage image(vw, vh, QImage::Format_RGB32);
-    GetDIBits(hMemoryDC, hBitmap, 0, vh, image.bits(), &bi, DIB_RGB_COLORS);
+    GetDIBits(hScreenDC, hBitmap, 0, vh, image.bits(), &bi, DIB_RGB_COLORS);
 
     DeleteObject(hBitmap);
     DeleteDC(hMemoryDC);
@@ -499,14 +459,41 @@ void AppManager::startSnipping() {
 
     if (m_webViewWasVisible) {
         QCoreApplication::processEvents();
-        QThread::msleep(30);
+        QThread::msleep(25);
         QCoreApplication::processEvents();
     } else {
         QCoreApplication::processEvents();
     }
 
-    // 3. Capture desktop across all monitors
+    // 3. Capture native GDI desktop across all monitors (Format_RGB32)
     m_fullScreenPixmap = captureNativeDesktop();
+
+    if (m_fullScreenPixmap.isNull() || m_fullScreenPixmap.width() < 50 || m_fullScreenPixmap.height() < 50) {
+        // Fallback to Qt Screen Grab with Format_RGB32
+        QList<QScreen*> screens = QGuiApplication::screens();
+        if (screens.isEmpty()) {
+            QScreen* screen = QGuiApplication::primaryScreen();
+            if (screen) {
+                m_fullScreenPixmap = screen->grabWindow(0);
+            }
+        } else {
+            QRect virtualGeo;
+            for (QScreen* s : screens) {
+                virtualGeo = virtualGeo.united(s->geometry());
+            }
+            QImage compositeImage(virtualGeo.size(), QImage::Format_RGB32);
+            compositeImage.fill(Qt::black);
+            QPainter painter(&compositeImage);
+            for (QScreen* s : screens) {
+                QPixmap screenPix = s->grabWindow(0);
+                int targetX = s->geometry().x() - virtualGeo.x();
+                int targetY = s->geometry().y() - virtualGeo.y();
+                painter.drawPixmap(targetX, targetY, s->geometry().width(), s->geometry().height(), screenPix);
+            }
+            painter.end();
+            m_fullScreenPixmap = QPixmap::fromImage(compositeImage);
+        }
+    }
 
     m_virtualOrigin = getVirtualDesktopGeometry().topLeft();
     m_snapshotTimestamp = QDateTime::currentMSecsSinceEpoch();

@@ -585,7 +585,10 @@ void WebViewWindow::injectPromptAndImage(const QString& base64Image, const QStri
                 if (state === 0) {
                     if (hasNewCard) {
                         state = 1; // Card confirmed! Transition to checking upload progress
-                        // Inject the prompt text now that the card is mounting
+                        injectText(el, promptText);
+                    } else if (elapsed > 3000) {
+                        // Safety fallback in case Gemini changed DOM selectors for attachment card
+                        state = 1;
                         injectText(el, promptText);
                     } else {
                         // STRICT RULE: DO NOT SEND! We MUST NOT submit if the image hasn't even mounted!
