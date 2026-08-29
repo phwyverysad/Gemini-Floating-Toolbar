@@ -205,6 +205,7 @@ Window {
         root.customToolbarX = 0;
         root.customToolbarY = 0;
         root.isCustomAskMode = false;
+        if (customInput) customInput.text = "";
         root.smartRect = Qt.rect(0, 0, 0, 0);
     }
 
@@ -278,6 +279,20 @@ Window {
         keyHandler.forceActiveFocus();
     }
 
+    function openCustomAsk() {
+        if (!root.hasConfirmedSelection) return;
+        root.isCustomAskMode = true;
+        customInput.text = "";
+        customInput.forceActiveFocus();
+    }
+
+    function submitCustomAsk() {
+        let q = customInput.text.trim();
+        if (q !== "") {
+            root.confirmCustomAsk(q);
+        }
+    }
+
     Item {
         id: keyHandler
         anchors.fill: parent
@@ -285,11 +300,16 @@ Window {
 
         Keys.onPressed: function(event) {
             if (root.isCustomAskMode) {
-                // In custom text typing mode, let customInput handle keystrokes
+                if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                    root.submitCustomAsk();
+                    event.accepted = true;
+                    return;
+                }
                 if (event.key === Qt.Key_Escape) {
                     root.isCustomAskMode = false;
                     keyHandler.forceActiveFocus();
                     event.accepted = true;
+                    return;
                 }
                 return;
             }
@@ -331,8 +351,7 @@ Window {
 
                 // Custom Ask Hotkeys: '0', 'T', '?'
                 if (event.key === Qt.Key_0 || event.key === Qt.Key_T || event.key === Qt.Key_Question || event.text === "0" || event.text === "t" || event.text === "T" || event.text === "?") {
-                    root.isCustomAskMode = true;
-                    customInput.forceActiveFocus();
+                    root.openCustomAsk();
                     event.accepted = true;
                     return;
                 }
@@ -342,22 +361,22 @@ Window {
 
     // --- GLOBAL TOP-LEVEL WINDOW SHORTCUTS ---
     Shortcut { sequence: "Escape"; context: Qt.WindowShortcut; onActivated: root.cancelSelection() }
-    Shortcut { sequence: "Return"; context: Qt.WindowShortcut; onActivated: { if (root.hasConfirmedSelection && !root.isCustomAskMode) root.confirmAndCopy() } }
-    Shortcut { sequence: "Enter"; context: Qt.WindowShortcut; onActivated: { if (root.hasConfirmedSelection && !root.isCustomAskMode) root.confirmAndCopy() } }
+    Shortcut { sequence: "Return"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode; context: Qt.WindowShortcut; onActivated: root.confirmAndCopy() }
+    Shortcut { sequence: "Enter"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode; context: Qt.WindowShortcut; onActivated: root.confirmAndCopy() }
 
-    Shortcut { sequence: "1"; context: Qt.WindowShortcut; onActivated: { if (root.hasConfirmedSelection && !root.isCustomAskMode && root.activeImagePrompts.length > 0) root.confirmAndTriggerPrompt(0) } }
-    Shortcut { sequence: "2"; context: Qt.WindowShortcut; onActivated: { if (root.hasConfirmedSelection && !root.isCustomAskMode && root.activeImagePrompts.length > 1) root.confirmAndTriggerPrompt(1) } }
-    Shortcut { sequence: "3"; context: Qt.WindowShortcut; onActivated: { if (root.hasConfirmedSelection && !root.isCustomAskMode && root.activeImagePrompts.length > 2) root.confirmAndTriggerPrompt(2) } }
-    Shortcut { sequence: "4"; context: Qt.WindowShortcut; onActivated: { if (root.hasConfirmedSelection && !root.isCustomAskMode && root.activeImagePrompts.length > 3) root.confirmAndTriggerPrompt(3) } }
-    Shortcut { sequence: "5"; context: Qt.WindowShortcut; onActivated: { if (root.hasConfirmedSelection && !root.isCustomAskMode && root.activeImagePrompts.length > 4) root.confirmAndTriggerPrompt(4) } }
-    Shortcut { sequence: "6"; context: Qt.WindowShortcut; onActivated: { if (root.hasConfirmedSelection && !root.isCustomAskMode && root.activeImagePrompts.length > 5) root.confirmAndTriggerPrompt(5) } }
-    Shortcut { sequence: "7"; context: Qt.WindowShortcut; onActivated: { if (root.hasConfirmedSelection && !root.isCustomAskMode && root.activeImagePrompts.length > 6) root.confirmAndTriggerPrompt(6) } }
-    Shortcut { sequence: "8"; context: Qt.WindowShortcut; onActivated: { if (root.hasConfirmedSelection && !root.isCustomAskMode && root.activeImagePrompts.length > 7) root.confirmAndTriggerPrompt(7) } }
-    Shortcut { sequence: "9"; context: Qt.WindowShortcut; onActivated: { if (root.hasConfirmedSelection && !root.isCustomAskMode && root.activeImagePrompts.length > 8) root.confirmAndTriggerPrompt(8) } }
+    Shortcut { sequence: "1"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && root.activeImagePrompts.length > 0; context: Qt.WindowShortcut; onActivated: root.confirmAndTriggerPrompt(0) }
+    Shortcut { sequence: "2"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && root.activeImagePrompts.length > 1; context: Qt.WindowShortcut; onActivated: root.confirmAndTriggerPrompt(1) }
+    Shortcut { sequence: "3"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && root.activeImagePrompts.length > 2; context: Qt.WindowShortcut; onActivated: root.confirmAndTriggerPrompt(2) }
+    Shortcut { sequence: "4"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && root.activeImagePrompts.length > 3; context: Qt.WindowShortcut; onActivated: root.confirmAndTriggerPrompt(3) }
+    Shortcut { sequence: "5"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && root.activeImagePrompts.length > 4; context: Qt.WindowShortcut; onActivated: root.confirmAndTriggerPrompt(4) }
+    Shortcut { sequence: "6"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && root.activeImagePrompts.length > 5; context: Qt.WindowShortcut; onActivated: root.confirmAndTriggerPrompt(5) }
+    Shortcut { sequence: "7"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && root.activeImagePrompts.length > 6; context: Qt.WindowShortcut; onActivated: root.confirmAndTriggerPrompt(6) }
+    Shortcut { sequence: "8"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && root.activeImagePrompts.length > 7; context: Qt.WindowShortcut; onActivated: root.confirmAndTriggerPrompt(7) }
+    Shortcut { sequence: "9"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && root.activeImagePrompts.length > 8; context: Qt.WindowShortcut; onActivated: root.confirmAndTriggerPrompt(8) }
 
-    Shortcut { sequence: "0"; context: Qt.WindowShortcut; onActivated: { if (root.hasConfirmedSelection && !root.isCustomAskMode) { root.isCustomAskMode = true; customInput.forceActiveFocus(); } } }
-    Shortcut { sequence: "T"; context: Qt.WindowShortcut; onActivated: { if (root.hasConfirmedSelection && !root.isCustomAskMode) { root.isCustomAskMode = true; customInput.forceActiveFocus(); } } }
-    Shortcut { sequence: "?"; context: Qt.WindowShortcut; onActivated: { if (root.hasConfirmedSelection && !root.isCustomAskMode) { root.isCustomAskMode = true; customInput.forceActiveFocus(); } } }
+    Shortcut { sequence: "0"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode; context: Qt.WindowShortcut; onActivated: root.openCustomAsk() }
+    Shortcut { sequence: "T"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode; context: Qt.WindowShortcut; onActivated: root.openCustomAsk() }
+    Shortcut { sequence: "?"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode; context: Qt.WindowShortcut; onActivated: root.openCustomAsk() }
 
     // --- OVERLAY ROOT ITEM ---
     Item {
@@ -943,8 +962,7 @@ Window {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            root.isCustomAskMode = true;
-                            customInput.forceActiveFocus();
+                            root.openCustomAsk();
                         }
                     }
                 }
@@ -1056,12 +1074,48 @@ Window {
                 Rectangle { width: 26; height: parent.height; radius: 6; color: backMouse.containsMouse ? "#f1f5f9" : "transparent"; anchors.verticalCenter: parent.verticalCenter; Text { anchors.centerIn: parent; text: "←"; font.pixelSize: 12; font.weight: Font.Normal; color: "#64748b" } MouseArea { id: backMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { root.isCustomAskMode = false; keyHandler.forceActiveFocus(); } } }
                 Rectangle {
                     width: parent.width - 14 - 26 - sendBtn.width - 24; height: parent.height; radius: 6; color: "#f8fafc"; border.color: customInput.activeFocus ? "#2563eb" : "#cbd5e1"; border.width: 1
-                    TextInput { id: customInput; anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8; verticalAlignment: TextInput.AlignVCenter; font.family: Theme.fontFamily; font.pixelSize: root.fontSize; color: "#0f172a"; selectByMouse: true; clip: true; Text { anchors.fill: parent; verticalAlignment: Text.AlignVCenter; visible: !customInput.text && !customInput.activeFocus; text: AppManager.isThai ? "พิมพ์คำถามของคุณที่นี่..." : "Ask Gemini about this screenshot..."; font.family: Theme.fontFamily; font.pixelSize: root.fontSize; color: "#94a3b8" } Keys.onPressed: function(event) { if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) { if (customInput.text.trim() !== "") { root.confirmCustomAsk(customInput.text.trim()); } event.accepted = true; } else if (event.key === Qt.Key_Escape) { root.isCustomAskMode = false; keyHandler.forceActiveFocus(); event.accepted = true; } } }
+                    TextInput {
+                        id: customInput
+                        anchors.fill: parent
+                        anchors.leftMargin: 8
+                        anchors.rightMargin: 8
+                        verticalAlignment: TextInput.AlignVCenter
+                        font.family: Theme.fontFamily
+                        font.pixelSize: root.fontSize
+                        color: "#0f172a"
+                        selectByMouse: true
+                        clip: true
+
+                        Text {
+                            anchors.fill: parent
+                            verticalAlignment: Text.AlignVCenter
+                            visible: !customInput.text && !customInput.activeFocus
+                            text: AppManager.isThai ? "พิมพ์คำถามของคุณที่นี่..." : "Ask Gemini about this screenshot..."
+                            font.family: Theme.fontFamily
+                            font.pixelSize: root.fontSize
+                            color: "#94a3b8"
+                        }
+
+                        onAccepted: {
+                            root.submitCustomAsk();
+                        }
+
+                        Keys.onPressed: function(event) {
+                            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                                root.submitCustomAsk();
+                                event.accepted = true;
+                            } else if (event.key === Qt.Key_Escape) {
+                                root.isCustomAskMode = false;
+                                keyHandler.forceActiveFocus();
+                                event.accepted = true;
+                            }
+                        }
+                    }
                 }
                 Rectangle {
                     id: sendBtn; width: sendContent.implicitWidth + 14; height: parent.height; radius: 6; color: sendMouse.containsMouse ? "#1d4ed8" : "#2563eb"; anchors.verticalCenter: parent.verticalCenter; scale: sendMouse.pressed ? 0.96 : (sendMouse.containsMouse ? 1.02 : 1.0); Behavior on scale { NumberAnimation { duration: 80; easing.type: Easing.OutQuad } }
                     Row { id: sendContent; anchors.centerIn: parent; spacing: 4; Text { text: AppManager.isThai ? "ส่ง" : "Send"; font.family: Theme.fontFamily; font.pixelSize: root.fontSize; font.weight: Font.Medium; color: "#ffffff"; anchors.verticalCenter: parent.verticalCenter } Text { text: "↵"; font.pixelSize: 11; color: "#93c5fd"; anchors.verticalCenter: parent.verticalCenter } }
-                    MouseArea { id: sendMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { if (customInput.text.trim() !== "") { root.confirmCustomAsk(customInput.text.trim()); } } }
+                    MouseArea { id: sendMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { root.submitCustomAsk(); } }
                 }
             }
         }
