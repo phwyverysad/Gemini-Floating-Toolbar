@@ -340,71 +340,6 @@ void WebViewWindow::injectPromptAndImage(const QString& base64Image, const QStri
         return true;
     }
 
-    function hasAttachedFile(inputEl) {
-        // Scoped check inside or near the input container first
-        const container = (inputEl ? (inputEl.closest('rich-textarea, .input-area, .chat-input, .text-input-field, form, .input-container, .bottom-container') || inputEl.parentElement) : null);
-        const searchScope = container || document;
-
-        const attachmentSelectors = [
-            '.attachment-card',
-            '.attachment-container',
-            '.file-preview',
-            '.image-preview',
-            '.uploader-preview',
-            'img.thumbnail',
-            'img[src^="blob:"]',
-            'img[src^="data:image"]',
-            '[aria-label*="Delete image" i]',
-            '[aria-label*="ลบรูปภาพ" i]',
-            '[aria-label*="Remove file" i]',
-            '[aria-label*="Remove attachment" i]',
-            '[aria-label*="Delete attachment" i]',
-            'button[mattooltip*="Delete" i]',
-            'button[mattooltip*="Remove" i]',
-            'button[mattooltip*="ลบ" i]',
-            'mat-chip[role="option"]',
-            '.file-bubble'
-        ];
-
-        for (const sel of attachmentSelectors) {
-            const found = searchScope.querySelector(sel);
-            if (found && found.offsetParent !== null) return true;
-        }
-
-        // Global fallback if container wasn't identified
-        if (container) {
-            for (const sel of attachmentSelectors) {
-                const found = document.querySelector(sel);
-                if (found && found.offsetParent !== null) return true;
-            }
-        }
-        return false;
-    }
-
-    function isUploading(inputEl) {
-        const container = (inputEl ? (inputEl.closest('rich-textarea, .input-area, .chat-input, .text-input-field, form, .input-container, .bottom-container') || inputEl.parentElement) : null);
-        const searchScope = container || document;
-
-        const spinnerSelectors = [
-            'mat-progress-spinner',
-            'mat-spinner',
-            '.mat-mdc-progress-spinner',
-            '.attachment-card .loading',
-            '.attachment-card .uploading',
-            '.image-preview .loading',
-            '.image-preview .uploading',
-            '.uploader-preview .loading',
-            '.spinner',
-            '[role="progressbar"]'
-        ];
-
-        for (const sel of spinnerSelectors) {
-            const found = searchScope.querySelector(sel);
-            if (found && found.offsetParent !== null) return true;
-        }
-        return false;
-    }
-
     function isSendButton(btn) {
         if (!btn || btn.offsetParent === null || btn.disabled || btn.getAttribute('aria-disabled') === 'true') return false;
         const aria = (btn.getAttribute('aria-label') || '').toLowerCase();
@@ -436,8 +371,8 @@ void WebViewWindow::injectPromptAndImage(const QString& base64Image, const QStri
     function findSendButton(inputEl) {
         // 1. First search inside the closest input container
         if (inputEl) {
-            let container = inputEl.closest('rich-textarea, .input-area, .chat-input, .text-input-field, form, .input-container, .bottom-container') || inputEl.parentElement;
-            for (let depth = 0; depth < 5 && container; depth++) {
+            let container = inputEl.closest('rich-textarea, .input-area, .chat-input, .text-input-field, form, .input-container, .bottom-container, .input-area-container') || inputEl.parentElement;
+            for (let depth = 0; depth < 6 && container; depth++) {
                 const candidates = Array.from(container.querySelectorAll('button'));
                 const found = candidates.find(b => isSendButton(b));
                 if (found) return found;
@@ -506,106 +441,126 @@ void WebViewWindow::injectPromptAndImage(const QString& base64Image, const QStri
         } catch(e) {}
     }
 
-    function executeSubmit(el, hasFile) {
-        if (!shouldSubmit) return;
-
-        let pollCount = 0;
-        const maxPoll = hasFile ? 400 : 80; // 10.0s for image attachment, 2.0s for text
-        let sent = false;
-        let hasSeenAttachment = false;
-
-        function doSend() {
-            if (sent) return true;
-            const runBtn = findSendButton(el);
-            if (runBtn) {
-                sent = true;
-                runBtn.click();
-                setTimeout(() => { pressEnterKey(el); }, 80);
-                return true;
-            } else if (el) {
-                sent = true;
-                pressEnterKey(el);
-                return true;
-            }
-            return false;
-        }
-
-        function checkAndSend() {
-            if (sent) return true;
-
-            const runBtn = findSendButton(el);
-            const isBtnEnabled = runBtn && !runBtn.disabled && runBtn.getAttribute('aria-disabled') !== 'true';
-
-            if (hasFile) {
-                const fileInDom = hasAttachedFile(el);
-                const uploading = isUploading(el);
-
-                if (fileInDom) {
-                    hasSeenAttachment = true;
-                }
-
-                // Strictly require that the attachment card is present, no upload spinner is active, and send button is enabled
-                if (hasSeenAttachment && fileInDom && !uploading && isBtnEnabled) {
-                    return doSend();
-                }
-            } else {
-                if (isBtnEnabled && pollCount >= 2) {
-                    return doSend();
-                }
-            }
-            return false;
-        }
-
-        // Try instant send if ready (only for text-only, or if image was instantly parsed)
-        if (checkAndSend()) return;
-
-        // High-frequency 25ms polling for instant response
-        const pollTimer = setInterval(() => {
-            pollCount++;
-
-            if (checkAndSend() || pollCount >= maxPoll) {
-                clearInterval(pollTimer);
-                if (observer) observer.disconnect();
-
-                if (!sent && pollCount >= maxPoll) {
-                    // Only send on timeout if not an image upload, or if image attachment is confirmed ready
-                    if (!hasFile || (hasSeenAttachment && !isUploading(el))) {
-                        doSend();
-                    }
-                }
-            }
-        }, 25);
-
-        // Real-time MutationObserver: triggers the exact microsecond upload spinner disappears
-        let observer = null;
-        try {
-            observer = new MutationObserver(() => {
-                if (checkAndSend()) {
-                    clearInterval(pollTimer);
-                    observer.disconnect();
-                }
-            });
-            observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled', 'aria-disabled', 'class', 'src'] });
-        } catch(e) {}
-    }
-
     function performInjection() {
         const el = findPromptInput();
         if (!el) return false;
 
         el.focus();
 
-        // 1. Inject prompt text
-        injectText(el, promptText);
-
-        // 2. Attach image file IMMEDIATELY
         const file = (base64Data && base64Data.length > 10) ? base64ToFile(base64Data, uniqueFileName) : null;
-        if (file) {
-            attachImage(file, el);
-        }
+        const container = el.closest('rich-textarea, .input-area, .chat-input, .text-input-field, form, .input-container, .bottom-container, .input-area-container') || el.parentElement;
 
-        // 3. High-speed reactive submit polling with 0ms MutationObserver
-        executeSubmit(el, !!file);
+        if (file) {
+            // Count existing attachment cards strictly inside the input container
+            const initialCardCount = container ? container.querySelectorAll('.attachment-card, .attachment-container, .image-preview, .uploader-preview, mat-chip, [aria-label*="Remove" i], [aria-label*="Delete" i], [aria-label*="ลบ" i], img').length : 0;
+            const attachStartTime = Date.now();
+
+            // 1. Attach the image file FIRST
+            attachImage(file, el);
+
+            // 2. Inject prompt text
+            injectText(el, promptText);
+
+            if (!shouldSubmit) return true;
+
+            // 3. Strict Synchronized Submit: Wait until image is 100% attached and uploaded
+            let pollCount = 0;
+            const maxPoll = 480; // 12.0 seconds maximum wait
+            let sent = false;
+            let cardAppeared = false;
+
+            function isContainerUploading() {
+                if (!container) return false;
+                const spinners = container.querySelectorAll('mat-progress-spinner, mat-spinner, .mat-mdc-progress-spinner, .loading, .uploading, [role="progressbar"]');
+                return Array.from(spinners).some(s => s.offsetParent !== null);
+            }
+
+            function hasNewContainerAttachment() {
+                if (!container) return false;
+                const currentCards = container.querySelectorAll('.attachment-card, .attachment-container, .image-preview, .uploader-preview, mat-chip, [aria-label*="Remove" i], [aria-label*="Delete" i], [aria-label*="ลบ" i], img');
+                return (currentCards.length > initialCardCount) || (currentCards.length > 0 && (Date.now() - attachStartTime > 350));
+            }
+
+            function trySynchronizedSubmit() {
+                if (sent) return true;
+
+                // Step A: Must wait for attachment card to appear inside input container
+                if (!cardAppeared) {
+                    if (hasNewContainerAttachment()) {
+                        cardAppeared = true;
+                    } else {
+                        return false; // Waiting for paste/upload card creation
+                    }
+                }
+
+                // Step B: Must wait for all upload spinners to disappear
+                if (isContainerUploading()) {
+                    return false; // Still actively uploading image bytes
+                }
+
+                // Step C: Must verify Send button is enabled
+                const runBtn = findSendButton(el);
+                const isBtnEnabled = runBtn && !runBtn.disabled && runBtn.getAttribute('aria-disabled') !== 'true';
+                if (!isBtnEnabled) {
+                    return false; // Waiting for Gemini to enable send button
+                }
+
+                // Step D: Ensure prompt text is still in the input field
+                const currentText = el.innerText || el.value || '';
+                if (promptText && !currentText.includes(promptText.trim())) {
+                    injectText(el, promptText);
+                }
+
+                // Step E: Send both Image & Prompt simultaneously!
+                sent = true;
+                runBtn.click();
+                setTimeout(() => { pressEnterKey(el); }, 80);
+                return true;
+            }
+
+            // High-frequency 25ms polling
+            const pollTimer = setInterval(() => {
+                pollCount++;
+                if (trySynchronizedSubmit() || pollCount >= maxPoll) {
+                    clearInterval(pollTimer);
+                    if (observer) observer.disconnect();
+                }
+            }, 25);
+
+            // Reactive DOM mutation observer
+            let observer = null;
+            try {
+                observer = new MutationObserver(() => {
+                    if (trySynchronizedSubmit()) {
+                        clearInterval(pollTimer);
+                        observer.disconnect();
+                    }
+                });
+                observer.observe(container || document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled', 'aria-disabled', 'class', 'src'] });
+            } catch(e) {}
+
+        } else {
+            // Text-only mode: direct injection and fast submit
+            injectText(el, promptText);
+
+            if (shouldSubmit) {
+                let pollCount = 0;
+                const pollTimer = setInterval(() => {
+                    pollCount++;
+                    const runBtn = findSendButton(el);
+                    const isBtnEnabled = runBtn && !runBtn.disabled && runBtn.getAttribute('aria-disabled') !== 'true';
+                    if ((isBtnEnabled && pollCount >= 2) || pollCount >= 80) {
+                        clearInterval(pollTimer);
+                        if (runBtn) {
+                            runBtn.click();
+                            setTimeout(() => { pressEnterKey(el); }, 60);
+                        } else {
+                            pressEnterKey(el);
+                        }
+                    }
+                }, 25);
+            }
+        }
 
         return true;
     }
