@@ -341,42 +341,40 @@ void WebViewWindow::injectPromptAndImage(const QString& base64Image, const QStri
     }
 
     function isSendButton(btn) {
-        if (!btn || btn.offsetParent === null || btn.disabled || btn.getAttribute('aria-disabled') === 'true') return false;
+        if (!btn || btn.offsetParent === null) return false;
+        if (btn.disabled || btn.getAttribute('aria-disabled') === 'true') return false;
+
         const aria = (btn.getAttribute('aria-label') || '').toLowerCase();
         const testId = (btn.getAttribute('data-test-id') || '').toLowerCase();
         const className = (btn.className || '').toLowerCase();
         const text = (btn.innerText || '').trim().toLowerCase();
+        const icon = Array.from(btn.querySelectorAll('mat-icon, svg, span, i')).map(e => (e.innerText || e.getAttribute('aria-label') || e.className || '').toLowerCase()).join(' ');
 
-        // Disqualify unrelated buttons
-        const badKeywords = [
-            'mic', 'audio', 'voice', 'ไมค์', 'ไมโครโฟน',
-            'upload', 'attach', 'file', 'แนบ', 'ไฟล์', 'image', 'รูปภาพ',
-            'menu', 'เมนู', 'history', 'ประวัติ', 'settings', 'ตั้งค่า',
-            'help', 'ช่วยเหลือ', 'account', 'บัญชี', 'profile', 'โปรไฟล์',
-            'model', 'tools', 'เครื่องมือ', 'sidebar', 'ไซด์บาร์',
-            'collapse', 'expand', 'more', 'เพิ่มเติม', 'delete', 'ลบ'
-        ];
-        for (const bad of badKeywords) {
-            if (aria.includes(bad) || testId.includes(bad)) return false;
-        }
+        // Disqualify mic, tools, model selector, attach buttons
+        if (aria.includes('mic') || aria.includes('ไมค์') || aria.includes('audio') || aria.includes('voice')) return false;
+        if (aria.includes('model') || aria.includes('โมเดล') || aria.includes('flash') || aria.includes('pro')) return false;
+        if (aria.includes('add') || aria.includes('attach') || aria.includes('แนบ') || aria.includes('upload') || aria.includes('file') || aria.includes('tools')) return false;
+        if (aria.includes('menu') || aria.includes('settings') || aria.includes('help') || aria.includes('account')) return false;
 
-        // Positive Send / Submit identifiers
-        if (aria.includes('send') || aria.includes('ส่ง') || aria.includes('submit') || aria.includes('run') || aria.includes('พร้อมท์')) return true;
+        // Positive match
+        if (aria.includes('send') || aria.includes('ส่ง') || aria.includes('submit') || aria.includes('run') || aria.includes('prompt') || aria.includes('พร้อมท์')) return true;
         if (testId.includes('send') || testId.includes('submit')) return true;
-        if (className.includes('send-button') || className.includes('send_button') || className.includes('chatsendbutton')) return true;
+        if (className.includes('send') || className.includes('submit')) return true;
         if (text === 'send' || text === 'ส่ง' || text === 'run') return true;
+        if (icon.includes('arrow_upward') || icon.includes('send') || icon.includes('north') || icon.includes('arrow-up') || icon.includes('submit')) return true;
+
         return false;
     }
 
     function findSendButton(inputEl) {
-        // 1. First search inside the closest input container
+        // 1. Search inside parent input container hierarchy
         if (inputEl) {
-            let container = inputEl.closest('rich-textarea, .input-area, .chat-input, .text-input-field, form, .input-container, .bottom-container, .input-area-container') || inputEl.parentElement;
-            for (let depth = 0; depth < 6 && container; depth++) {
-                const candidates = Array.from(container.querySelectorAll('button'));
+            let cur = inputEl.parentElement;
+            for (let depth = 0; depth < 8 && cur && cur !== document.body; depth++) {
+                const candidates = Array.from(cur.querySelectorAll('button, div[role="button"]'));
                 const found = candidates.find(b => isSendButton(b));
                 if (found) return found;
-                container = container.parentElement;
+                cur = cur.parentElement;
             }
         }
 
@@ -385,6 +383,8 @@ void WebViewWindow::injectPromptAndImage(const QString& base64Image, const QStri
             'button.send-button',
             'button[aria-label*="Send message" i]',
             'button[aria-label*="ส่งข้อความ" i]',
+            'button[aria-label*="Send prompt" i]',
+            'button[aria-label*="ส่งพร้อมท์" i]',
             'button[aria-label="Send" i]',
             'button[aria-label="ส่ง" i]',
             'button[aria-label*="Submit" i]',
@@ -401,8 +401,8 @@ void WebViewWindow::injectPromptAndImage(const QString& base64Image, const QStri
             if (found) return found;
         }
 
-        // 3. Scoped search near bottom of page
-        const allButtons = Array.from(document.querySelectorAll('button'));
+        // 3. Fallback: Search all visible buttons near bottom of page
+        const allButtons = Array.from(document.querySelectorAll('button, div[role="button"]'));
         for (let i = allButtons.length - 1; i >= 0; i--) {
             if (isSendButton(allButtons[i])) return allButtons[i];
         }
@@ -448,11 +448,18 @@ void WebViewWindow::injectPromptAndImage(const QString& base64Image, const QStri
         el.focus();
 
         const file = (base64Data && base64Data.length > 10) ? base64ToFile(base64Data, uniqueFileName) : null;
-        const container = el.closest('rich-textarea, .input-area, .chat-input, .text-input-field, form, .input-container, .bottom-container, .input-area-container') || el.parentElement;
+
+        // Traverse up to find the root input area container that holds both textarea, image previews, and send button
+        let rootContainer = el.parentElement;
+        for (let i = 0; i < 8 && rootContainer && rootContainer !== document.body; i++) {
+            if (rootContainer.querySelector('button') && (rootContainer.classList.contains('input-area-container') || rootContainer.classList.contains('bottom-container') || rootContainer.classList.contains('chat-input-container') || rootContainer.tagName === 'FORM')) {
+                break;
+            }
+            rootContainer = rootContainer.parentElement;
+        }
+        if (!rootContainer) rootContainer = document.body;
 
         if (file) {
-            // Count existing attachment cards strictly inside the input container
-            const initialCardCount = container ? container.querySelectorAll('.attachment-card, .attachment-container, .image-preview, .uploader-preview, mat-chip, [aria-label*="Remove" i], [aria-label*="Delete" i], [aria-label*="ลบ" i], img').length : 0;
             const attachStartTime = Date.now();
 
             // 1. Attach the image file FIRST
@@ -463,80 +470,80 @@ void WebViewWindow::injectPromptAndImage(const QString& base64Image, const QStri
 
             if (!shouldSubmit) return true;
 
-            // 3. Strict Synchronized Submit: Wait until image is 100% attached and uploaded
+            // 3. Strict Sequential Submit
             let pollCount = 0;
-            const maxPoll = 480; // 12.0 seconds maximum wait
+            const maxPoll = 240; // 6.0 seconds maximum
             let sent = false;
-            let cardAppeared = false;
 
-            function isContainerUploading() {
-                if (!container) return false;
-                const spinners = container.querySelectorAll('mat-progress-spinner, mat-spinner, .mat-mdc-progress-spinner, .loading, .uploading, [role="progressbar"]');
+            function isUploadingActive() {
+                const spinners = rootContainer.querySelectorAll('mat-progress-spinner, mat-spinner, .mat-mdc-progress-spinner, .loading, .uploading, [role="progressbar"]');
                 return Array.from(spinners).some(s => s.offsetParent !== null);
             }
 
-            function hasNewContainerAttachment() {
-                if (!container) return false;
-                const currentCards = container.querySelectorAll('.attachment-card, .attachment-container, .image-preview, .uploader-preview, mat-chip, [aria-label*="Remove" i], [aria-label*="Delete" i], [aria-label*="ลบ" i], img');
-                return (currentCards.length > initialCardCount) || (currentCards.length > 0 && (Date.now() - attachStartTime > 350));
+            function doSendNow() {
+                if (sent) return true;
+                sent = true;
+                const runBtn = findSendButton(el);
+                if (runBtn) {
+                    runBtn.click();
+                    setTimeout(() => { pressEnterKey(el); }, 80);
+                } else {
+                    pressEnterKey(el);
+                }
+                return true;
             }
 
-            function trySynchronizedSubmit() {
+            function checkCanSend() {
                 if (sent) return true;
+                const elapsed = Date.now() - attachStartTime;
 
-                // Step A: Must wait for attachment card to appear inside input container
-                if (!cardAppeared) {
-                    if (hasNewContainerAttachment()) {
-                        cardAppeared = true;
-                    } else {
-                        return false; // Waiting for paste/upload card creation
-                    }
-                }
+                // Enforce minimum 300ms wait for paste event to dispatch and render
+                if (elapsed < 300) return false;
 
-                // Step B: Must wait for all upload spinners to disappear
-                if (isContainerUploading()) {
-                    return false; // Still actively uploading image bytes
-                }
+                // If upload spinner is actively visible, keep waiting
+                if (isUploadingActive()) return false;
 
-                // Step C: Must verify Send button is enabled
+                // Check if Send button is found and enabled
                 const runBtn = findSendButton(el);
-                const isBtnEnabled = runBtn && !runBtn.disabled && runBtn.getAttribute('aria-disabled') !== 'true';
-                if (!isBtnEnabled) {
-                    return false; // Waiting for Gemini to enable send button
+                if (runBtn) {
+                    // Double check prompt text is still present
+                    const currentText = el.innerText || el.value || '';
+                    if (promptText && !currentText.includes(promptText.trim())) {
+                        injectText(el, promptText);
+                    }
+                    return doSendNow();
                 }
 
-                // Step D: Ensure prompt text is still in the input field
-                const currentText = el.innerText || el.value || '';
-                if (promptText && !currentText.includes(promptText.trim())) {
-                    injectText(el, promptText);
+                // If after 1.5s the upload has no spinners, try sending via Enter
+                if (elapsed >= 1500 && !isUploadingActive()) {
+                    return doSendNow();
                 }
 
-                // Step E: Send both Image & Prompt simultaneously!
-                sent = true;
-                runBtn.click();
-                setTimeout(() => { pressEnterKey(el); }, 80);
-                return true;
+                return false;
             }
 
             // High-frequency 25ms polling
             const pollTimer = setInterval(() => {
                 pollCount++;
-                if (trySynchronizedSubmit() || pollCount >= maxPoll) {
+                if (checkCanSend() || pollCount >= maxPoll) {
                     clearInterval(pollTimer);
                     if (observer) observer.disconnect();
+                    if (!sent && pollCount >= maxPoll) {
+                        doSendNow();
+                    }
                 }
             }, 25);
 
-            // Reactive DOM mutation observer
+            // Reactive MutationObserver
             let observer = null;
             try {
                 observer = new MutationObserver(() => {
-                    if (trySynchronizedSubmit()) {
+                    if (checkCanSend()) {
                         clearInterval(pollTimer);
                         observer.disconnect();
                     }
                 });
-                observer.observe(container || document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled', 'aria-disabled', 'class', 'src'] });
+                observer.observe(rootContainer, { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled', 'aria-disabled', 'class', 'src'] });
             } catch(e) {}
 
         } else {
