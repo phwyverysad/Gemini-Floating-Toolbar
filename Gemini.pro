@@ -15,24 +15,29 @@ DEFINES += UNICODE _UNICODE NDEBUG
 
 INCLUDEPATH += \
     $$PWD/packages/WebView2/build/native/include \
+    $$PWD/packages/tesseract/include \
     $$PWD/resources \
     $$PWD/src
 
 LIBS += \
     -L$$PWD/packages/WebView2/build/native/x64 \
     -lWebView2LoaderStatic \
+    -L$$PWD/packages/tesseract/lib \
+    -ltesseract52 -lleptonica-1.82.0 \
     -lshell32 -luser32 -lgdi32 -ladvapi32 -lole32 -loleaut32 -lshlwapi -ldwmapi
 
 HEADERS += \
     src/AppManager.h \
     src/WebViewWindow.h \
     src/SnapshotImageProvider.h \
+    src/OcrEngine.h \
     resources/resource.h
 
 SOURCES += \
     src/main.cpp \
     src/AppManager.cpp \
-    src/WebViewWindow.cpp
+    src/WebViewWindow.cpp \
+    src/OcrEngine.cpp
 
 RESOURCES += \
     resources/qml.qrc

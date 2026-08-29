@@ -1,6 +1,7 @@
 #include "AppManager.h"
 #include "WebViewWindow.h"
 #include "SnapshotImageProvider.h"
+#include "OcrEngine.h"
 #include <QDebug>
 #include <QScreen>
 #include <QGuiApplication>
@@ -1506,6 +1507,40 @@ void AppManager::captureAndTriggerCustomPrompt(int x, int y, int w, int h, const
     m_activeSelectedText.clear();
 
     triggerCustomPrompt(customPrompt, "image", autoRun);
+}
+
+QString AppManager::performOcr(int x, int y, int w, int h, const QString& lang) {
+    if (w <= 2 || h <= 2) return QString();
+    if (m_fullScreenPixmap.isNull()) {
+        m_fullScreenPixmap = SnapshotImageProvider::instance()->getSnapshot();
+    }
+    if (m_fullScreenPixmap.isNull()) return QString();
+
+    int px = qBound(0, x, m_fullScreenPixmap.width());
+    int py = qBound(0, y, m_fullScreenPixmap.height());
+    int pw = qMin(w, m_fullScreenPixmap.width() - px);
+    int ph = qMin(h, m_fullScreenPixmap.height() - py);
+
+    if (pw <= 0 || ph <= 0) return QString();
+
+    QPixmap cropped = m_fullScreenPixmap.copy(px, py, pw, ph);
+    QString recognized = OcrEngine::instance()->recognizeText(cropped, lang);
+    return recognized;
+}
+
+void AppManager::copyTextToClipboard(const QString& text) {
+    QClipboard* clipboard = QGuiApplication::clipboard();
+    if (clipboard) {
+        clipboard->setText(text);
+    }
+}
+
+bool AppManager::isOcrAvailable() const {
+    return OcrEngine::instance()->isAvailable();
+}
+
+QStringList AppManager::availableOcrLanguages() const {
+    return OcrEngine::instance()->availableLanguages();
 }
 
 void AppManager::exitApp() {

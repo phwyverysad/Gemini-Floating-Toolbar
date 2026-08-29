@@ -58,7 +58,7 @@ Get-ChildItem -Path $ProjectDir -Filter "*.dll" -File | ForEach-Object {
     Copy-Item -Path $_.FullName -Destination $PortableDir -Force
 }
 
-$DirsToCopy = @("platforms", "imageformats", "iconengines", "styles", "tls", "networkinformation", "generic", "qml", "qmltooling", "resources")
+$DirsToCopy = @("platforms", "imageformats", "iconengines", "styles", "tls", "networkinformation", "generic", "qml", "qmltooling", "resources", "tessdata")
 foreach ($d in $DirsToCopy) {
     $srcDir = Join-Path $ProjectDir $d
     if (Test-Path $srcDir) {

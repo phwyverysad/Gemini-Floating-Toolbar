@@ -78,6 +78,12 @@ public:
     Q_INVOKABLE qint64 getSnapshotTimestamp() const { return m_snapshotTimestamp; }
     Q_INVOKABLE QRect getVirtualDesktopGeometry();
 
+    // OCR Text Recognition Methods
+    Q_INVOKABLE QString performOcr(int x, int y, int w, int h, const QString& lang = "tha+eng");
+    Q_INVOKABLE void copyTextToClipboard(const QString& text);
+    Q_INVOKABLE bool isOcrAvailable() const;
+    Q_INVOKABLE QStringList availableOcrLanguages() const;
+
     // UI Window Navigation (Invokable from QML / Tray)
     Q_INVOKABLE void showSettingsDialog();
     Q_INVOKABLE void hideSettingsDialog();

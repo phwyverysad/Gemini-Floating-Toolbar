@@ -93,6 +93,12 @@ Window {
     // Custom Ask inline input state
     property bool isCustomAskMode: false
 
+    // OCR Mode & Result State
+    property bool isOcrResultMode: false
+    property string ocrResultText: ""
+    property bool isOcrProcessing: false
+    property bool ocrCopiedToast: false
+
     property bool isAnyDragging: isSelecting || isRightSelecting
 
     property int maskX: hasConfirmedSelection ? confirmedX : (isRightSelecting ? rightSelX : selX)
@@ -177,6 +183,8 @@ Window {
         if (root.captureMode === "freeform") {
             setCaptureMode("window");
         } else if (root.captureMode === "window") {
+            setCaptureMode("ocr");
+        } else if (root.captureMode === "ocr") {
             setCaptureMode("smart");
         } else {
             setCaptureMode("freeform");
@@ -205,6 +213,10 @@ Window {
         root.customToolbarX = 0;
         root.customToolbarY = 0;
         root.isCustomAskMode = false;
+        root.isOcrResultMode = false;
+        root.ocrResultText = "";
+        root.isOcrProcessing = false;
+        root.ocrCopiedToast = false;
         if (customInput) customInput.text = "";
         root.smartRect = Qt.rect(0, 0, 0, 0);
     }
@@ -223,7 +235,36 @@ Window {
         root.hasCustomToolbarPos = false;
         root.hasConfirmedSelection = true;
         root.isCustomAskMode = false;
+        root.isOcrResultMode = false;
         keyHandler.forceActiveFocus();
+
+        if (root.captureMode === "ocr") {
+            root.runOcr();
+        }
+    }
+
+    function runOcr() {
+        if (!root.hasConfirmedSelection || root.confirmedW < 4 || root.confirmedH < 4) return;
+        root.isOcrProcessing = true;
+        root.isOcrResultMode = true;
+        root.ocrResultText = "";
+        root.ocrCopiedToast = false;
+        let text = AppManager.performOcr(root.confirmedX, root.confirmedY, root.confirmedW, root.confirmedH, "tha+eng");
+        root.ocrResultText = text;
+        root.isOcrProcessing = false;
+        if (text && text.trim() !== "") {
+            AppManager.copyTextToClipboard(text);
+            root.ocrCopiedToast = true;
+        }
+    }
+
+    function askGeminiOcr(promptPrefix) {
+        let textToUse = ocrEditText.text ? ocrEditText.text.trim() : (root.ocrResultText ? root.ocrResultText.trim() : "");
+        if (!textToUse) return;
+        let fullQuery = (promptPrefix ? (promptPrefix + ":\n\n") : "") + textToUse;
+        AppManager.triggerCustomPrompt(fullQuery, "text", true);
+        root.resetSelection();
+        root.hide();
     }
 
     function confirmAndCopy() {
@@ -254,6 +295,10 @@ Window {
     }
 
     function cancelSelection() {
+        if (root.isOcrResultMode) {
+            root.isOcrResultMode = false;
+            return;
+        }
         if (root.isCustomAskMode) {
             root.isCustomAskMode = false;
             return;
@@ -299,6 +344,15 @@ Window {
         focus: true
 
         Keys.onPressed: function(event) {
+            if (root.isOcrResultMode) {
+                if (event.key === Qt.Key_Escape) {
+                    root.isOcrResultMode = false;
+                    event.accepted = true;
+                    return;
+                }
+                return;
+            }
+
             if (root.isCustomAskMode) {
                 if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                     root.submitCustomAsk();
@@ -333,6 +387,13 @@ Window {
                     return;
                 }
 
+                // OCR Hotkey: 'O' or 'o'
+                if (event.key === Qt.Key_O || event.text === "o" || event.text === "O") {
+                    root.runOcr();
+                    event.accepted = true;
+                    return;
+                }
+
                 // Numeric keys 1 to 9 (top row or numpad)
                 let numIdx = -1;
                 if (event.key >= Qt.Key_1 && event.key <= Qt.Key_9) {
@@ -361,22 +422,23 @@ Window {
 
     // --- GLOBAL TOP-LEVEL WINDOW SHORTCUTS ---
     Shortcut { sequence: "Escape"; context: Qt.WindowShortcut; onActivated: root.cancelSelection() }
-    Shortcut { sequence: "Return"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode; context: Qt.WindowShortcut; onActivated: root.confirmAndCopy() }
-    Shortcut { sequence: "Enter"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode; context: Qt.WindowShortcut; onActivated: root.confirmAndCopy() }
+    Shortcut { sequence: "Return"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && !root.isOcrResultMode; context: Qt.WindowShortcut; onActivated: root.confirmAndCopy() }
+    Shortcut { sequence: "Enter"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && !root.isOcrResultMode; context: Qt.WindowShortcut; onActivated: root.confirmAndCopy() }
 
-    Shortcut { sequence: "1"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && root.activeImagePrompts.length > 0; context: Qt.WindowShortcut; onActivated: root.confirmAndTriggerPrompt(0) }
-    Shortcut { sequence: "2"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && root.activeImagePrompts.length > 1; context: Qt.WindowShortcut; onActivated: root.confirmAndTriggerPrompt(1) }
-    Shortcut { sequence: "3"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && root.activeImagePrompts.length > 2; context: Qt.WindowShortcut; onActivated: root.confirmAndTriggerPrompt(2) }
-    Shortcut { sequence: "4"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && root.activeImagePrompts.length > 3; context: Qt.WindowShortcut; onActivated: root.confirmAndTriggerPrompt(3) }
-    Shortcut { sequence: "5"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && root.activeImagePrompts.length > 4; context: Qt.WindowShortcut; onActivated: root.confirmAndTriggerPrompt(4) }
-    Shortcut { sequence: "6"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && root.activeImagePrompts.length > 5; context: Qt.WindowShortcut; onActivated: root.confirmAndTriggerPrompt(5) }
-    Shortcut { sequence: "7"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && root.activeImagePrompts.length > 6; context: Qt.WindowShortcut; onActivated: root.confirmAndTriggerPrompt(6) }
-    Shortcut { sequence: "8"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && root.activeImagePrompts.length > 7; context: Qt.WindowShortcut; onActivated: root.confirmAndTriggerPrompt(7) }
-    Shortcut { sequence: "9"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && root.activeImagePrompts.length > 8; context: Qt.WindowShortcut; onActivated: root.confirmAndTriggerPrompt(8) }
+    Shortcut { sequence: "1"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && !root.isOcrResultMode && root.activeImagePrompts.length > 0; context: Qt.WindowShortcut; onActivated: root.confirmAndTriggerPrompt(0) }
+    Shortcut { sequence: "2"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && !root.isOcrResultMode && root.activeImagePrompts.length > 1; context: Qt.WindowShortcut; onActivated: root.confirmAndTriggerPrompt(1) }
+    Shortcut { sequence: "3"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && !root.isOcrResultMode && root.activeImagePrompts.length > 2; context: Qt.WindowShortcut; onActivated: root.confirmAndTriggerPrompt(2) }
+    Shortcut { sequence: "4"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && !root.isOcrResultMode && root.activeImagePrompts.length > 3; context: Qt.WindowShortcut; onActivated: root.confirmAndTriggerPrompt(3) }
+    Shortcut { sequence: "5"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && !root.isOcrResultMode && root.activeImagePrompts.length > 4; context: Qt.WindowShortcut; onActivated: root.confirmAndTriggerPrompt(4) }
+    Shortcut { sequence: "6"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && !root.isOcrResultMode && root.activeImagePrompts.length > 5; context: Qt.WindowShortcut; onActivated: root.confirmAndTriggerPrompt(5) }
+    Shortcut { sequence: "7"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && !root.isOcrResultMode && root.activeImagePrompts.length > 6; context: Qt.WindowShortcut; onActivated: root.confirmAndTriggerPrompt(6) }
+    Shortcut { sequence: "8"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && !root.isOcrResultMode && root.activeImagePrompts.length > 7; context: Qt.WindowShortcut; onActivated: root.confirmAndTriggerPrompt(7) }
+    Shortcut { sequence: "9"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && !root.isOcrResultMode && root.activeImagePrompts.length > 8; context: Qt.WindowShortcut; onActivated: root.confirmAndTriggerPrompt(8) }
 
-    Shortcut { sequence: "0"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode; context: Qt.WindowShortcut; onActivated: root.openCustomAsk() }
-    Shortcut { sequence: "T"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode; context: Qt.WindowShortcut; onActivated: root.openCustomAsk() }
-    Shortcut { sequence: "?"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode; context: Qt.WindowShortcut; onActivated: root.openCustomAsk() }
+    Shortcut { sequence: "0"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && !root.isOcrResultMode; context: Qt.WindowShortcut; onActivated: root.openCustomAsk() }
+    Shortcut { sequence: "T"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && !root.isOcrResultMode; context: Qt.WindowShortcut; onActivated: root.openCustomAsk() }
+    Shortcut { sequence: "?"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && !root.isOcrResultMode; context: Qt.WindowShortcut; onActivated: root.openCustomAsk() }
+    Shortcut { sequence: "O"; enabled: root.hasConfirmedSelection && !root.isCustomAskMode && !root.isOcrResultMode; context: Qt.WindowShortcut; onActivated: root.runOcr() }
 
     // --- OVERLAY ROOT ITEM ---
     Item {
@@ -827,22 +889,23 @@ Window {
 
             x: root.hasCustomToolbarPos ? root.customToolbarX : defaultX
             y: root.hasCustomToolbarPos ? root.customToolbarY : defaultY
-            width: root.isCustomAskMode ? 460 : (buttonRow.implicitWidth + 16)
-            height: root.barHeight
+            width: root.isOcrResultMode ? Math.min(root.width - 24, 580) : (root.isCustomAskMode ? 460 : (buttonRow.implicitWidth + 16))
+            height: root.isOcrResultMode ? 148 : root.barHeight
             radius: 8
             color: "#ffffff"
             border.color: "#e2e8f0"
             border.width: 1
 
             Behavior on width { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+            Behavior on height { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
             Rectangle { anchors.fill: parent; anchors.margins: -1; radius: 9; color: "transparent"; border.color: "#180f172a"; border.width: 1; z: -1 }
 
             Row {
                 id: buttonRow
                 anchors.centerIn: parent
                 spacing: 4
-                visible: !root.isCustomAskMode
-                opacity: root.isCustomAskMode ? 0.0 : 1.0
+                visible: !root.isCustomAskMode && !root.isOcrResultMode
+                opacity: (!root.isCustomAskMode && !root.isOcrResultMode) ? 1.0 : 0.0
                 Behavior on opacity { NumberAnimation { duration: 100 } }
 
                 // Drag handle (Moves ONLY the toolbar, leaving crop box in place)
@@ -909,6 +972,66 @@ Window {
                         MouseArea { id: btnMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { root.confirmAndTriggerPrompt(index); } }
                     }
                 }
+
+                // OCR Text Button (สแกนข้อความ)
+                Rectangle {
+                    id: ocrBtn
+                    width: ocrContent.implicitWidth + 14
+                    height: root.btnHeight
+                    radius: 6
+                    color: ocrMouse.containsMouse ? "#ecfdf5" : "transparent"
+                    border.color: ocrMouse.containsMouse ? "#a7f3d0" : "transparent"
+                    border.width: 1
+                    anchors.verticalCenter: parent.verticalCenter
+                    scale: ocrMouse.pressed ? 0.96 : (ocrMouse.containsMouse ? 1.02 : 1.0)
+                    Behavior on scale { NumberAnimation { duration: 80; easing.type: Easing.OutQuad } }
+
+                    Row {
+                        id: ocrContent
+                        anchors.centerIn: parent
+                        spacing: 6
+
+                        Rectangle {
+                            width: Math.max(root.badgeSize, ocrBadgeText.implicitWidth + 6)
+                            height: root.badgeSize
+                            radius: 4
+                            color: "#ecfdf5"
+                            border.color: "#d1fae5"
+                            border.width: 1
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            Text {
+                                id: ocrBadgeText
+                                anchors.centerIn: parent
+                                text: "O"
+                                font.family: Theme.fontFamily
+                                font.pixelSize: root.badgeFontSize
+                                font.weight: Font.DemiBold
+                                color: "#059669"
+                            }
+                        }
+
+                        Text {
+                            text: AppManager.isThai ? "สแกนข้อความ" : "OCR Text"
+                            font.family: Theme.fontFamily
+                            font.pixelSize: root.fontSize
+                            font.weight: Font.Normal
+                            color: "#065f46"
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                    }
+
+                    MouseArea {
+                        id: ocrMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            root.runOcr();
+                        }
+                    }
+                }
+
                 Rectangle {
                     id: customAskBtn
                     width: customAskContent.implicitWidth + 14
@@ -1030,8 +1153,10 @@ Window {
                     MouseArea { id: cancelMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { root.cancelSelection(); } }
                 }
             }
+
+            // Custom Ask Input Row
             Row {
-                id: customInputRow; anchors.fill: parent; anchors.margins: 4; spacing: 6; visible: root.isCustomAskMode; opacity: root.isCustomAskMode ? 1.0 : 0.0; Behavior on opacity { NumberAnimation { duration: 100 } }
+                id: customInputRow; anchors.fill: parent; anchors.margins: 4; spacing: 6; visible: root.isCustomAskMode && !root.isOcrResultMode; opacity: (root.isCustomAskMode && !root.isOcrResultMode) ? 1.0 : 0.0; Behavior on opacity { NumberAnimation { duration: 100 } }
                 Rectangle {
                     width: 14
                     height: parent.height
@@ -1118,6 +1243,133 @@ Window {
                     MouseArea { id: sendMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { root.submitCustomAsk(); } }
                 }
             }
+
+            // OCR Result View Container
+            Column {
+                id: ocrResultCol
+                anchors.fill: parent
+                anchors.margins: 8
+                spacing: 6
+                visible: root.isOcrResultMode
+                opacity: root.isOcrResultMode ? 1.0 : 0.0
+                Behavior on opacity { NumberAnimation { duration: 120 } }
+
+                // Header Row
+                Row {
+                    width: parent.width
+                    height: 20
+                    spacing: 8
+
+                    Text {
+                        text: AppManager.isThai ? "📝 ข้อความที่สแกนได้ (OCR):" : "📝 Scanned Text (OCR):"
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 11
+                        font.weight: Font.Bold
+                        color: "#0f172a"
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+
+                    Rectangle {
+                        visible: root.ocrCopiedToast
+                        height: 18
+                        width: copiedText.implicitWidth + 10
+                        radius: 4
+                        color: "#d1fae5"
+                        anchors.verticalCenter: parent.verticalCenter
+                        Text { id: copiedText; anchors.centerIn: parent; text: AppManager.isThai ? "✓ คัดลอกลงคลิปบอร์ดแล้ว" : "✓ Copied to clipboard"; font.pixelSize: 10; font.weight: Font.DemiBold; color: "#065f46" }
+                    }
+
+                    Item { width: 1; height: 1; Layout.fillWidth: true }
+
+                    Rectangle {
+                        width: 18; height: 18; radius: 9; color: ocrCloseMouse.containsMouse ? "#fee2e2" : "transparent"; anchors.verticalCenter: parent.verticalCenter; anchors.right: parent.right
+                        Text { anchors.centerIn: parent; text: "✕"; font.pixelSize: 10; color: ocrCloseMouse.containsMouse ? "#ef4444" : "#94a3b8" }
+                        MouseArea { id: ocrCloseMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { root.isOcrResultMode = false; } }
+                    }
+                }
+
+                // Text Display / Edit Area
+                Rectangle {
+                    width: parent.width
+                    height: 72
+                    radius: 6
+                    color: "#f8fafc"
+                    border.color: ocrEditText.activeFocus ? "#059669" : "#cbd5e1"
+                    border.width: 1
+
+                    Flickable {
+                        id: ocrFlick
+                        anchors.fill: parent
+                        anchors.margins: 6
+                        contentWidth: ocrEditText.paintedWidth
+                        contentHeight: ocrEditText.paintedHeight
+                        clip: true
+
+                        TextEdit {
+                            id: ocrEditText
+                            width: ocrFlick.width
+                            text: root.ocrResultText
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 11
+                            color: "#0f172a"
+                            wrapMode: TextEdit.Wrap
+                            selectByMouse: true
+
+                            Text {
+                                anchors.fill: parent
+                                visible: !ocrEditText.text && !root.isOcrProcessing
+                                text: AppManager.isThai ? "(ไม่พบข้อความในบริเวณที่เลือก)" : "(No text detected in selected region)"
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                                color: "#94a3b8"
+                            }
+                            Text {
+                                anchors.fill: parent
+                                visible: root.isOcrProcessing
+                                text: AppManager.isThai ? "กำลังสแกนข้อความ..." : "Scanning text..."
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                                color: "#059669"
+                            }
+                        }
+                    }
+                }
+
+                // OCR Action Buttons Row
+                Row {
+                    width: parent.width
+                    height: 26
+                    spacing: 6
+
+                    // Copy Text button
+                    Rectangle {
+                        height: 24; width: copyOcrContent.implicitWidth + 12; radius: 5; color: copyOcrMouse.containsMouse ? "#10b981" : "#059669"
+                        Row { id: copyOcrContent; anchors.centerIn: parent; spacing: 4; Text { text: "📋 " + (AppManager.isThai ? "คัดลอกข้อความ" : "Copy Text"); font.family: Theme.fontFamily; font.pixelSize: 10; font.weight: Font.Medium; color: "#ffffff" } }
+                        MouseArea { id: copyOcrMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { if (ocrEditText.text) { AppManager.copyTextToClipboard(ocrEditText.text); root.ocrCopiedToast = true; } } }
+                    }
+
+                    // Ask Gemini button
+                    Rectangle {
+                        height: 24; width: askOcrContent.implicitWidth + 12; radius: 5; color: askOcrMouse.containsMouse ? "#2563eb" : "#1d4ed8"
+                        Row { id: askOcrContent; anchors.centerIn: parent; spacing: 4; Text { text: "✨ " + (AppManager.isThai ? "ถาม Gemini" : "Ask Gemini"); font.family: Theme.fontFamily; font.pixelSize: 10; font.weight: Font.Medium; color: "#ffffff" } }
+                        MouseArea { id: askOcrMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { root.askGeminiOcr(""); } }
+                    }
+
+                    // Translate button
+                    Rectangle {
+                        height: 24; width: transOcrContent.implicitWidth + 12; radius: 5; color: transOcrMouse.containsMouse ? "#f1f5f9" : "#ffffff"; border.color: "#cbd5e1"; border.width: 1
+                        Row { id: transOcrContent; anchors.centerIn: parent; spacing: 4; Text { text: "🌐 " + (AppManager.isThai ? "แปลภาษา" : "Translate"); font.family: Theme.fontFamily; font.pixelSize: 10; font.weight: Font.Normal; color: "#1e293b" } }
+                        MouseArea { id: transOcrMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { root.askGeminiOcr(AppManager.isThai ? "ช่วยแปลข้อความนี้เป็นภาษาไทยและภาษาอังกฤษ" : "Translate this text into Thai and English"); } }
+                    }
+
+                    // Summarize button
+                    Rectangle {
+                        height: 24; width: sumOcrContent.implicitWidth + 12; radius: 5; color: sumOcrMouse.containsMouse ? "#f1f5f9" : "#ffffff"; border.color: "#cbd5e1"; border.width: 1
+                        Row { id: sumOcrContent; anchors.centerIn: parent; spacing: 4; Text { text: "📄 " + (AppManager.isThai ? "สรุปใจความ" : "Summarize"); font.family: Theme.fontFamily; font.pixelSize: 10; font.weight: Font.Normal; color: "#1e293b" } }
+                        MouseArea { id: sumOcrMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { root.askGeminiOcr(AppManager.isThai ? "ช่วยสรุปใจความสำคัญของข้อความนี้" : "Summarize the key points of this text"); } }
+                    }
+                }
+            }
         }
 
         // 8. Top Snip Mode Hint Bar
@@ -1148,6 +1400,11 @@ Window {
                     MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { root.setCaptureMode("window"); } }
                 }
                 Rectangle {
+                    width: ocrPillRow.implicitWidth + 16; height: 26; radius: 13; color: root.captureMode === "ocr" ? "#d1fae5" : "#ffffff"; border.color: root.captureMode === "ocr" ? "#059669" : "#e2e8f0"; border.width: 1; anchors.verticalCenter: parent.verticalCenter
+                    Row { id: ocrPillRow; anchors.centerIn: parent; spacing: 4; Rectangle { width: 6; height: 6; radius: 3; color: root.captureMode === "ocr" ? "#059669" : "#94a3b8"; anchors.verticalCenter: parent.verticalCenter } Text { text: AppManager.isThai ? "สแกนข้อความ" : "Text OCR"; font.family: Theme.fontFamily; font.pixelSize: 11; font.weight: root.captureMode === "ocr" ? Font.Bold : Font.Medium; color: root.captureMode === "ocr" ? "#047857" : "#64748b"; anchors.verticalCenter: parent.verticalCenter } }
+                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { root.setCaptureMode("ocr"); } }
+                }
+                Rectangle {
                     width: smartPillRow.implicitWidth + 16; height: 26; radius: 13; color: root.captureMode === "smart" ? "#ede9fe" : "#ffffff"; border.color: root.captureMode === "smart" ? "#8b5cf6" : "#e2e8f0"; border.width: 1; anchors.verticalCenter: parent.verticalCenter
                     Row { id: smartPillRow; anchors.centerIn: parent; spacing: 4; Rectangle { width: 6; height: 6; radius: 3; color: root.captureMode === "smart" ? "#8b5cf6" : "#94a3b8"; anchors.verticalCenter: parent.verticalCenter } Text { text: AppManager.isThai ? "ตรวจจับโครงสร้าง" : "Smart Detect"; font.family: Theme.fontFamily; font.pixelSize: 11; font.weight: root.captureMode === "smart" ? Font.Bold : Font.Medium; color: root.captureMode === "smart" ? "#6d28d9" : "#64748b"; anchors.verticalCenter: parent.verticalCenter } }
                     MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { root.setCaptureMode("smart"); } }
@@ -1155,9 +1412,10 @@ Window {
                 Rectangle { width: 1; height: 16; color: "#e2e8f0"; anchors.verticalCenter: parent.verticalCenter }
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: root.captureMode === "window" ? (AppManager.isThai ? "คลิกที่หน้าต่างเพื่อเลือก | [Alt/Tab] สลับโหมด | [Esc] ยกเลิก" : "Click window to snap | [Alt/Tab] Switch mode | [Esc] Cancel") :
+                    text: root.captureMode === "ocr" ? (AppManager.isThai ? "ลากครอบตัดเพื่อสแกนข้อความ | [Alt/Tab] สลับโหมด | [Esc] ยกเลิก" : "Drag region to OCR text | [Alt/Tab] Switch mode | [Esc] Cancel") :
+                          (root.captureMode === "window" ? (AppManager.isThai ? "คลิกที่หน้าต่างเพื่อเลือก | [Alt/Tab] สลับโหมด | [Esc] ยกเลิก" : "Click window to snap | [Alt/Tab] Switch mode | [Esc] Cancel") :
                           (root.captureMode === "smart" ? (AppManager.isThai ? "คลิกโครงสร้างเพื่อเลือก | [Alt/Tab] สลับโหมด | [Esc] ยกเลิก" : "Click element to snap | [Alt/Tab] Switch mode | [Esc] Cancel") :
-                          (AppManager.isThai ? "ลากเพื่อครอบตัด | [Alt/Tab] สลับโหมด | [Esc] ยกเลิก" : "Drag to crop | [Alt/Tab] Switch mode | [Esc] Cancel"))
+                          (AppManager.isThai ? "ลากเพื่อครอบตัด | [Alt/Tab] สลับโหมด | [Esc] ยกเลิก" : "Drag to crop | [Alt/Tab] Switch mode | [Esc] Cancel")))
                     font.family: Theme.fontFamily; font.pixelSize: 11; font.weight: Font.Normal; color: "#64748b"
                 }
             }
