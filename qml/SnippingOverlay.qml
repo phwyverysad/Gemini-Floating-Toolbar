@@ -453,12 +453,14 @@ Window {
             fillMode: Image.Stretch
             cache: false
             asynchronous: false
+            enabled: false
         }
 
         // 2. Translucent Dimming (Darkens unselected parts)
         Item {
             id: dimContainer
             anchors.fill: parent
+            enabled: false
             property bool active: root.hasConfirmedSelection || root.isAnyDragging
 
             Rectangle {
@@ -485,6 +487,7 @@ Window {
         // 2.5 Window Snip Mode Highlight Rectangle (Indigo / Accent Blue)
         Rectangle {
             id: windowHighlightRect
+            enabled: false
             visible: !root.hasConfirmedSelection && !root.isAnyDragging && root.captureMode === "window" && root.hoveredWindow.found && root.hoveredWindow.width > 20 && root.hoveredWindow.height > 20
             x: root.hoveredWindow.x; y: root.hoveredWindow.y; width: root.hoveredWindow.width; height: root.hoveredWindow.height
             color: "#182563eb"; border.color: "#2563eb"; border.width: 2; radius: 4; z: 82
@@ -512,6 +515,7 @@ Window {
         // 3. Smart Element Detection Highlight Box (Purple)
         Rectangle {
             id: smartHighlightRect
+            enabled: false
             visible: !root.hasConfirmedSelection && !root.isAnyDragging && root.captureMode === "smart" && root.smartRect.width > 4 && root.smartRect.height > 4
             x: root.smartRect.x; y: root.smartRect.y; width: root.smartRect.width; height: root.smartRect.height
             color: "#188b5cf6"; border.color: "#8b5cf6"; border.width: 1.5; z: 80
@@ -536,6 +540,7 @@ Window {
         // 4. Right-Click Drag Smart Auto-Fit Selection Rectangle (Cyan)
         Rectangle {
             id: roughSelRect
+            enabled: false
             visible: !root.hasConfirmedSelection && root.isRightSelecting && root.rightSelW > 0 && root.rightSelH > 0
             x: root.rightSelX; y: root.rightSelY; width: root.rightSelW; height: root.rightSelH
             color: "#1806b6d4"; border.color: "#06b6d4"; border.width: 1.8; z: 88
@@ -562,6 +567,7 @@ Window {
         // 5. Active Drag Freeform Selection Rectangle (Sky Blue)
         Rectangle {
             id: selRect
+            enabled: false
             visible: !root.hasConfirmedSelection && root.isSelecting && root.selW > 0 && root.selH > 0
             x: root.selX; y: root.selY; width: root.selW; height: root.selH
             color: "#12ffffff"; border.color: "#0284c7"; border.width: 1.5; z: 85
@@ -1466,6 +1472,7 @@ Window {
         Canvas {
             id: crosshairCanvas
             anchors.fill: parent
+            enabled: false
             visible: root.mouseX > 0 && root.mouseY > 0 && !root.hasConfirmedSelection
             z: 99
             onPaint: {

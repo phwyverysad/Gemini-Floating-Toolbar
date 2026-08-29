@@ -383,6 +383,16 @@ void AppManager::handleGlobalHotkey(int hotkeyId) {
 }
 
 QRect AppManager::getVirtualDesktopGeometry() {
+    QList<QScreen*> screens = QGuiApplication::screens();
+    if (!screens.isEmpty()) {
+        QRect virtualGeo;
+        for (QScreen* s : screens) {
+            virtualGeo = virtualGeo.united(s->geometry());
+        }
+        if (!virtualGeo.isEmpty() && virtualGeo.width() > 100 && virtualGeo.height() > 100) {
+            return virtualGeo;
+        }
+    }
     int vx = GetSystemMetrics(SM_XVIRTUALSCREEN);
     int vy = GetSystemMetrics(SM_YVIRTUALSCREEN);
     int vw = GetSystemMetrics(SM_CXVIRTUALSCREEN);
@@ -459,40 +469,35 @@ void AppManager::startSnipping() {
 
     if (m_webViewWasVisible) {
         QCoreApplication::processEvents();
-        QThread::msleep(20);
+        QThread::msleep(25);
         QCoreApplication::processEvents();
     } else {
         QCoreApplication::processEvents();
     }
 
-    // 3. Capture native GDI desktop across all monitors (Format_RGB32)
-    m_fullScreenPixmap = captureNativeDesktop();
+    // 3. Robust Multi-Monitor Screenshot Capture with high-DPI precision
+    QList<QScreen*> screens = QGuiApplication::screens();
+    if (screens.size() == 1) {
+        m_fullScreenPixmap = screens.first()->grabWindow(0);
+    } else if (screens.size() > 1) {
+        QRect virtualGeo = getVirtualDesktopGeometry();
+        QImage compositeImage(virtualGeo.size(), QImage::Format_RGB32);
+        compositeImage.fill(Qt::black);
+        QPainter painter(&compositeImage);
+        for (QScreen* s : screens) {
+            QPixmap screenPix = s->grabWindow(0);
+            int targetX = s->geometry().x() - virtualGeo.x();
+            int targetY = s->geometry().y() - virtualGeo.y();
+            painter.drawPixmap(targetX, targetY, s->geometry().width(), s->geometry().height(), screenPix);
+        }
+        painter.end();
+        m_fullScreenPixmap = QPixmap::fromImage(compositeImage);
+    } else {
+        m_fullScreenPixmap = captureNativeDesktop();
+    }
 
     if (m_fullScreenPixmap.isNull() || m_fullScreenPixmap.width() < 50 || m_fullScreenPixmap.height() < 50) {
-        // Fallback to Qt Screen Grab with Format_RGB32
-        QList<QScreen*> screens = QGuiApplication::screens();
-        if (screens.isEmpty()) {
-            QScreen* screen = QGuiApplication::primaryScreen();
-            if (screen) {
-                m_fullScreenPixmap = screen->grabWindow(0);
-            }
-        } else {
-            QRect virtualGeo;
-            for (QScreen* s : screens) {
-                virtualGeo = virtualGeo.united(s->geometry());
-            }
-            QImage compositeImage(virtualGeo.size(), QImage::Format_RGB32);
-            compositeImage.fill(Qt::black);
-            QPainter painter(&compositeImage);
-            for (QScreen* s : screens) {
-                QPixmap screenPix = s->grabWindow(0);
-                int targetX = s->geometry().x() - virtualGeo.x();
-                int targetY = s->geometry().y() - virtualGeo.y();
-                painter.drawPixmap(targetX, targetY, s->geometry().width(), s->geometry().height(), screenPix);
-            }
-            painter.end();
-            m_fullScreenPixmap = QPixmap::fromImage(compositeImage);
-        }
+        m_fullScreenPixmap = captureNativeDesktop();
     }
 
     m_virtualOrigin = getVirtualDesktopGeometry().topLeft();
@@ -1428,7 +1433,10 @@ void AppManager::processScreenCrop(int x, int y, int w, int h) {
 }
 
 void AppManager::captureAndCopy(int x, int y, int w, int h) {
-    if (w <= 5 || h <= 5) return;
+    if (w <= 2 || h <= 2) return;
+    if (m_fullScreenPixmap.isNull()) {
+        m_fullScreenPixmap = SnapshotImageProvider::instance()->getSnapshot();
+    }
     if (m_fullScreenPixmap.isNull()) return;
 
     int px = qBound(0, x, m_fullScreenPixmap.width());
@@ -1439,7 +1447,6 @@ void AppManager::captureAndCopy(int x, int y, int w, int h) {
     if (pw <= 0 || ph <= 0) return;
 
     QPixmap cropped = m_fullScreenPixmap.copy(px, py, pw, ph);
-    m_fullScreenPixmap = QPixmap();
 
     QClipboard* clipboard = QGuiApplication::clipboard();
     if (clipboard) {
@@ -1448,7 +1455,10 @@ void AppManager::captureAndCopy(int x, int y, int w, int h) {
 }
 
 void AppManager::captureAndTriggerAction(int x, int y, int w, int h, int promptIndex) {
-    if (w <= 5 || h <= 5) return;
+    if (w <= 2 || h <= 2) return;
+    if (m_fullScreenPixmap.isNull()) {
+        m_fullScreenPixmap = SnapshotImageProvider::instance()->getSnapshot();
+    }
     if (m_fullScreenPixmap.isNull()) return;
 
     int px = qBound(0, x, m_fullScreenPixmap.width());
@@ -1459,7 +1469,6 @@ void AppManager::captureAndTriggerAction(int x, int y, int w, int h, int promptI
     if (pw <= 0 || ph <= 0) return;
 
     QPixmap cropped = m_fullScreenPixmap.copy(px, py, pw, ph);
-    m_fullScreenPixmap = QPixmap();
 
     QClipboard* clipboard = QGuiApplication::clipboard();
     if (clipboard) {
