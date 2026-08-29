@@ -1254,11 +1254,52 @@ Window {
                 opacity: root.isOcrResultMode ? 1.0 : 0.0
                 Behavior on opacity { NumberAnimation { duration: 120 } }
 
-                // Header Row
+                // Header Row (with drag handle and close button)
                 Row {
                     width: parent.width
                     height: 20
-                    spacing: 8
+                    spacing: 6
+
+                    // Mini Drag Handle for OCR Result card
+                    Rectangle {
+                        width: 14
+                        height: 18
+                        radius: 3
+                        color: ocrDragMouse.containsMouse ? "#edf2f7" : "transparent"
+                        anchors.verticalCenter: parent.verticalCenter
+                        Grid { anchors.centerIn: parent; columns: 2; spacing: 2.5; Repeater { model: 6; Rectangle { width: 2.5; height: 2.5; radius: 1.25; color: ocrDragMouse.containsMouse ? "#1e293b" : "#94a3b8" } } }
+
+                        MouseArea {
+                            id: ocrDragMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.SizeAllCursor
+
+                            property real startMouseX: 0
+                            property real startMouseY: 0
+                            property real startBarX: 0
+                            property real startBarY: 0
+
+                            onPressed: function(m) {
+                                let pos = ocrDragMouse.mapToItem(overlayRoot, m.x, m.y);
+                                startMouseX = pos.x;
+                                startMouseY = pos.y;
+                                startBarX = floatingActionBar.x;
+                                startBarY = floatingActionBar.y;
+                            }
+
+                            onPositionChanged: function(m) {
+                                if (pressed) {
+                                    let pos = ocrDragMouse.mapToItem(overlayRoot, m.x, m.y);
+                                    let dx = pos.x - startMouseX;
+                                    let dy = pos.y - startMouseY;
+                                    root.hasCustomToolbarPos = true;
+                                    root.customToolbarX = Math.max(10, Math.min(root.width - floatingActionBar.width - 10, startBarX + dx));
+                                    root.customToolbarY = Math.max(10, Math.min(root.height - floatingActionBar.height - 10, startBarY + dy));
+                                }
+                            }
+                        }
+                    }
 
                     Text {
                         text: AppManager.isThai ? "📝 ข้อความที่สแกนได้ (OCR):" : "📝 Scanned Text (OCR):"
@@ -1276,7 +1317,7 @@ Window {
                         radius: 4
                         color: "#d1fae5"
                         anchors.verticalCenter: parent.verticalCenter
-                        Text { id: copiedText; anchors.centerIn: parent; text: AppManager.isThai ? "✓ คัดลอกลงคลิปบอร์ดแล้ว" : "✓ Copied to clipboard"; font.pixelSize: 10; font.weight: Font.DemiBold; color: "#065f46" }
+                        Text { id: copiedText; anchors.centerIn: parent; text: AppManager.isThai ? "✓ คัดลอกแล้ว" : "✓ Copied"; font.pixelSize: 10; font.weight: Font.DemiBold; color: "#065f46" }
                     }
 
                     Item { width: 1; height: 1; Layout.fillWidth: true }

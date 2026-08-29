@@ -83,17 +83,30 @@ Window {
             }
         }
     }
-    Shortcut { sequence: "1"; onActivated: if (!root.isCustomAskMode && root.activePrompts.length > 0) root.triggerPromptWithAnim(0) }
-    Shortcut { sequence: "2"; onActivated: if (!root.isCustomAskMode && root.activePrompts.length > 1) root.triggerPromptWithAnim(1) }
-    Shortcut { sequence: "3"; onActivated: if (!root.isCustomAskMode && root.activePrompts.length > 2) root.triggerPromptWithAnim(2) }
-    Shortcut { sequence: "4"; onActivated: if (!root.isCustomAskMode && root.activePrompts.length > 3) root.triggerPromptWithAnim(3) }
-    Shortcut { sequence: "5"; onActivated: if (!root.isCustomAskMode && root.activePrompts.length > 4) root.triggerPromptWithAnim(4) }
-    Shortcut { sequence: "6"; onActivated: if (!root.isCustomAskMode && root.activePrompts.length > 5) root.triggerPromptWithAnim(5) }
-    Shortcut { sequence: "7"; onActivated: if (!root.isCustomAskMode && root.activePrompts.length > 6) root.triggerPromptWithAnim(6) }
-    Shortcut { sequence: "8"; onActivated: if (!root.isCustomAskMode && root.activePrompts.length > 7) root.triggerPromptWithAnim(7) }
-    Shortcut { sequence: "9"; onActivated: if (!root.isCustomAskMode && root.activePrompts.length > 8) root.triggerPromptWithAnim(8) }
-    Shortcut { sequence: "0"; onActivated: if (!root.isCustomAskMode) root.openCustomAskMode() }
-    Shortcut { sequence: "T"; onActivated: if (!root.isCustomAskMode) root.openCustomAskMode() }
+    Shortcut { sequence: "1"; enabled: !root.isCustomAskMode && root.activePrompts.length > 0; onActivated: root.triggerPromptWithAnim(0) }
+    Shortcut { sequence: "2"; enabled: !root.isCustomAskMode && root.activePrompts.length > 1; onActivated: root.triggerPromptWithAnim(1) }
+    Shortcut { sequence: "3"; enabled: !root.isCustomAskMode && root.activePrompts.length > 2; onActivated: root.triggerPromptWithAnim(2) }
+    Shortcut { sequence: "4"; enabled: !root.isCustomAskMode && root.activePrompts.length > 3; onActivated: root.triggerPromptWithAnim(3) }
+    Shortcut { sequence: "5"; enabled: !root.isCustomAskMode && root.activePrompts.length > 4; onActivated: root.triggerPromptWithAnim(4) }
+    Shortcut { sequence: "6"; enabled: !root.isCustomAskMode && root.activePrompts.length > 5; onActivated: root.triggerPromptWithAnim(5) }
+    Shortcut { sequence: "7"; enabled: !root.isCustomAskMode && root.activePrompts.length > 6; onActivated: root.triggerPromptWithAnim(6) }
+    Shortcut { sequence: "8"; enabled: !root.isCustomAskMode && root.activePrompts.length > 7; onActivated: root.triggerPromptWithAnim(7) }
+    Shortcut { sequence: "9"; enabled: !root.isCustomAskMode && root.activePrompts.length > 8; onActivated: root.triggerPromptWithAnim(8) }
+    Shortcut { sequence: "0"; enabled: !root.isCustomAskMode; onActivated: root.openCustomAskMode() }
+    Shortcut { sequence: "T"; enabled: !root.isCustomAskMode; onActivated: root.openCustomAskMode() }
+    Shortcut { sequence: "?"; enabled: !root.isCustomAskMode; onActivated: root.openCustomAskMode() }
+    Shortcut {
+        sequence: "O"
+        enabled: !root.isCustomAskMode && root.targetType === "image"
+        onActivated: {
+            let text = AppManager.performOcr(0, 0, 99999, 99999, "tha+eng");
+            if (text && text.trim() !== "") {
+                AppManager.copyTextToClipboard(text);
+                AppManager.triggerCustomPrompt(text, "text", AppManager.autoRun);
+            }
+            root.animateHide();
+        }
+    }
 
     function reloadPrompts() {
         let combined = [];
@@ -538,6 +551,72 @@ Window {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: root.triggerPromptWithAnim(index)
+                    }
+                }
+            }
+
+            // OCR Text Button (Visible when targetType === "image")
+            Rectangle {
+                id: ocrToolbarBtn
+                visible: root.targetType === "image"
+                width: ocrToolbarContent.implicitWidth + 14
+                height: root.btnHeight
+                radius: 6
+                color: ocrToolbarMouse.containsMouse ? (Theme.isDark ? "#143a2c" : "#ecfdf5") : "transparent"
+                border.color: ocrToolbarMouse.containsMouse ? (Theme.isDark ? "#059669" : "#a7f3d0") : "transparent"
+                border.width: 1
+
+                scale: ocrToolbarMouse.pressed ? 0.96 : (ocrToolbarMouse.containsMouse ? 1.02 : 1.0)
+                Behavior on scale { NumberAnimation { duration: 90; easing.type: Easing.OutQuad } }
+                Behavior on color { ColorAnimation { duration: 90 } }
+
+                Row {
+                    id: ocrToolbarContent
+                    anchors.centerIn: parent
+                    spacing: 6
+
+                    Rectangle {
+                        width: Math.max(root.badgeSize, ocrToolbarBadge.implicitWidth + 6)
+                        height: root.badgeSize
+                        radius: 4
+                        color: Theme.isDark ? "#064e3b" : "#ecfdf5"
+                        border.color: Theme.isDark ? "#047857" : "#d1fae5"
+                        border.width: 1
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        Text {
+                            id: ocrToolbarBadge
+                            anchors.centerIn: parent
+                            text: "O"
+                            font.family: Theme.fontFamily
+                            font.pixelSize: root.badgeFontSize
+                            font.weight: Font.DemiBold
+                            color: "#10b981"
+                        }
+                    }
+
+                    Text {
+                        text: AppManager.isThai ? "สแกนข้อความ" : "OCR Text"
+                        font.family: Theme.fontFamily
+                        font.pixelSize: root.fontSize
+                        font.weight: Font.Normal
+                        color: Theme.isDark ? "#a7f3d0" : "#065f46"
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                }
+
+                MouseArea {
+                    id: ocrToolbarMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        let text = AppManager.performOcr(0, 0, 99999, 99999, "tha+eng");
+                        if (text && text.trim() !== "") {
+                            AppManager.copyTextToClipboard(text);
+                            AppManager.triggerCustomPrompt(text, "text", AppManager.autoRun);
+                        }
+                        root.animateHide();
                     }
                 }
             }

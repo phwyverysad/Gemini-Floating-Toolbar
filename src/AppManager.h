@@ -33,6 +33,8 @@ class AppManager : public QObject {
     Q_PROPERTY(QVariantList textPrompts READ textPrompts NOTIFY settingsChanged)
     Q_PROPERTY(QVariantList customAskPrompts READ customAskPrompts NOTIFY settingsChanged)
     Q_PROPERTY(QVariantList categories READ categories NOTIFY settingsChanged)
+    Q_PROPERTY(bool autoRun READ autoRun NOTIFY settingsChanged)
+    Q_PROPERTY(bool startWithWindows READ startWithWindows NOTIFY settingsChanged)
 
 public:
     static AppManager* instance();
@@ -49,6 +51,8 @@ public:
     QVariantList textPrompts() const { return m_textPrompts; }
     QVariantList customAskPrompts() const { return m_customAskPrompts; }
     QVariantList categories() const { return m_categories; }
+    bool autoRun() const { return m_autoRun; }
+    bool startWithWindows() const { return m_startWithWindows; }
 
     void setWebViewWindow(WebViewWindow* webView) { m_webViewWindow = webView; }
 

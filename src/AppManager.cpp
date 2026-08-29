@@ -1631,6 +1631,7 @@ void AppManager::cancelAction() {
     removeToolbarKeyboardHook();
     m_activeBase64Image.clear();
     m_activeSelectedText.clear();
+    m_fullScreenPixmap = QPixmap();
     if (m_webViewWasVisible && m_webViewWindow) {
         m_webViewWindow->restoreAndShow();
         m_webViewWasVisible = false;
