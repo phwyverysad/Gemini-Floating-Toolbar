@@ -101,6 +101,7 @@ public:
     void startQuickAskFlow();
     QString autoCopySelectedText();
     QPixmap captureNativeDesktop();
+    QRect mapQmlRectToPixmap(int x, int y, int w, int h) const;
 
     Q_INVOKABLE void installToolbarKeyboardHook(const QString& targetType);
     Q_INVOKABLE void removeToolbarKeyboardHook();

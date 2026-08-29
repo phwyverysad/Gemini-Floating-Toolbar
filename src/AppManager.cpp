@@ -1388,22 +1388,37 @@ void AppManager::startQuickAskFlow() {
     emit requestShowToolbar("text", pt.x, pt.y);
 }
 
+QRect AppManager::mapQmlRectToPixmap(int x, int y, int w, int h) const {
+    if (m_fullScreenPixmap.isNull()) return QRect();
+    QRect vGeo = const_cast<AppManager*>(this)->getVirtualDesktopGeometry();
+    double scaleX = (vGeo.width() > 0) ? ((double)m_fullScreenPixmap.width() / (double)vGeo.width()) : 1.0;
+    double scaleY = (vGeo.height() > 0) ? ((double)m_fullScreenPixmap.height() / (double)vGeo.height()) : 1.0;
+
+    int px = qRound(x * scaleX);
+    int py = qRound(y * scaleY);
+    int pw = qRound(w * scaleX);
+    int ph = qRound(h * scaleY);
+
+    px = qBound(0, px, m_fullScreenPixmap.width() - 1);
+    py = qBound(0, py, m_fullScreenPixmap.height() - 1);
+    pw = qBound(1, pw, m_fullScreenPixmap.width() - px);
+    ph = qBound(1, ph, m_fullScreenPixmap.height() - py);
+
+    return QRect(px, py, pw, ph);
+}
+
 void AppManager::processScreenCrop(int x, int y, int w, int h) {
-    if (w <= 4 || h <= 4) return;
+    if (w <= 2 || h <= 2) return;
 
     if (m_fullScreenPixmap.isNull()) {
         m_fullScreenPixmap = SnapshotImageProvider::instance()->getSnapshot();
     }
     if (m_fullScreenPixmap.isNull()) return;
 
-    int px = qBound(0, x, m_fullScreenPixmap.width());
-    int py = qBound(0, y, m_fullScreenPixmap.height());
-    int pw = qMin(w, m_fullScreenPixmap.width() - px);
-    int ph = qMin(h, m_fullScreenPixmap.height() - py);
+    QRect cropRect = mapQmlRectToPixmap(x, y, w, h);
+    if (cropRect.isEmpty() || cropRect.width() <= 0 || cropRect.height() <= 0) return;
 
-    if (pw <= 0 || ph <= 0) return;
-
-    QPixmap cropped = m_fullScreenPixmap.copy(px, py, pw, ph);
+    QPixmap cropped = m_fullScreenPixmap.copy(cropRect);
 
     // Set Windows clipboard with cropped image
     QClipboard* clipboard = QGuiApplication::clipboard();
@@ -1420,8 +1435,8 @@ void AppManager::processScreenCrop(int x, int y, int w, int h) {
     m_activeSelectedText.clear();
 
     // Compute global coordinates for toolbar placement
-    m_lastCropBottomX = m_virtualOrigin.x() + px + (pw / 2);
-    m_lastCropBottomY = m_virtualOrigin.y() + py + ph;
+    m_lastCropBottomX = m_virtualOrigin.x() + x + (w / 2);
+    m_lastCropBottomY = m_virtualOrigin.y() + y + h;
 
     installToolbarKeyboardHook("image");
     emit requestShowToolbar("image", m_lastCropBottomX, m_lastCropBottomY);
@@ -1434,14 +1449,10 @@ void AppManager::captureAndCopy(int x, int y, int w, int h) {
     }
     if (m_fullScreenPixmap.isNull()) return;
 
-    int px = qBound(0, x, m_fullScreenPixmap.width());
-    int py = qBound(0, y, m_fullScreenPixmap.height());
-    int pw = qMin(w, m_fullScreenPixmap.width() - px);
-    int ph = qMin(h, m_fullScreenPixmap.height() - py);
+    QRect cropRect = mapQmlRectToPixmap(x, y, w, h);
+    if (cropRect.isEmpty() || cropRect.width() <= 0 || cropRect.height() <= 0) return;
 
-    if (pw <= 0 || ph <= 0) return;
-
-    QPixmap cropped = m_fullScreenPixmap.copy(px, py, pw, ph);
+    QPixmap cropped = m_fullScreenPixmap.copy(cropRect);
 
     QClipboard* clipboard = QGuiApplication::clipboard();
     if (clipboard) {
@@ -1456,14 +1467,10 @@ void AppManager::captureAndTriggerAction(int x, int y, int w, int h, int promptI
     }
     if (m_fullScreenPixmap.isNull()) return;
 
-    int px = qBound(0, x, m_fullScreenPixmap.width());
-    int py = qBound(0, y, m_fullScreenPixmap.height());
-    int pw = qMin(w, m_fullScreenPixmap.width() - px);
-    int ph = qMin(h, m_fullScreenPixmap.height() - py);
+    QRect cropRect = mapQmlRectToPixmap(x, y, w, h);
+    if (cropRect.isEmpty() || cropRect.width() <= 0 || cropRect.height() <= 0) return;
 
-    if (pw <= 0 || ph <= 0) return;
-
-    QPixmap cropped = m_fullScreenPixmap.copy(px, py, pw, ph);
+    QPixmap cropped = m_fullScreenPixmap.copy(cropRect);
 
     QClipboard* clipboard = QGuiApplication::clipboard();
     if (clipboard) {
@@ -1488,14 +1495,10 @@ void AppManager::captureAndTriggerCustomPrompt(int x, int y, int w, int h, const
     }
     if (m_fullScreenPixmap.isNull()) return;
 
-    int px = qBound(0, x, m_fullScreenPixmap.width());
-    int py = qBound(0, y, m_fullScreenPixmap.height());
-    int pw = qMin(w, m_fullScreenPixmap.width() - px);
-    int ph = qMin(h, m_fullScreenPixmap.height() - py);
+    QRect cropRect = mapQmlRectToPixmap(x, y, w, h);
+    if (cropRect.isEmpty() || cropRect.width() <= 0 || cropRect.height() <= 0) return;
 
-    if (pw <= 0 || ph <= 0) return;
-
-    QPixmap cropped = m_fullScreenPixmap.copy(px, py, pw, ph);
+    QPixmap cropped = m_fullScreenPixmap.copy(cropRect);
 
     QClipboard* clipboard = QGuiApplication::clipboard();
     if (clipboard) {
@@ -1627,14 +1630,10 @@ QString AppManager::performOcr(int x, int y, int w, int h, const QString& lang) 
     }
     if (m_fullScreenPixmap.isNull()) return QString();
 
-    int px = qBound(0, x, m_fullScreenPixmap.width());
-    int py = qBound(0, y, m_fullScreenPixmap.height());
-    int pw = qMin(w, m_fullScreenPixmap.width() - px);
-    int ph = qMin(h, m_fullScreenPixmap.height() - py);
+    QRect cropRect = mapQmlRectToPixmap(x, y, w, h);
+    if (cropRect.isEmpty() || cropRect.width() <= 0 || cropRect.height() <= 0) return QString();
 
-    if (pw <= 0 || ph <= 0) return QString();
-
-    QImage cropped = m_fullScreenPixmap.copy(px, py, pw, ph).toImage();
+    QImage cropped = m_fullScreenPixmap.copy(cropRect).toImage();
     QString text = TextScanner::instance().recognizeImage(cropped, lang);
     return text;
 }
