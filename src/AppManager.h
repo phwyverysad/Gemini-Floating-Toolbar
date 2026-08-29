@@ -74,6 +74,7 @@ public:
     Q_INVOKABLE QRect detectElementBounds(int localX, int localY);
     Q_INVOKABLE QRect autoFitElementBounds(int rx, int ry, int rw, int rh);
     Q_INVOKABLE QRect snapSelectionToContent(int x, int y, int w, int h, int snapThreshold = 8);
+    Q_INVOKABLE QJsonObject detectWindowAt(int screenX, int screenY);
     Q_INVOKABLE qint64 getSnapshotTimestamp() const { return m_snapshotTimestamp; }
     Q_INVOKABLE QRect getVirtualDesktopGeometry();
 

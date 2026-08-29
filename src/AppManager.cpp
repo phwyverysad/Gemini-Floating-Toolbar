@@ -846,6 +846,123 @@ QRect AppManager::detectElementBounds(int localX, int localY) {
     return QRect(qMax(0, localX - 100), qMax(0, localY - 60), 200, 120);
 }
 
+QJsonObject AppManager::detectWindowAt(int screenX, int screenY) {
+    QJsonObject result;
+    result["found"] = false;
+
+    if (m_fullScreenPixmap.isNull()) return result;
+
+    int globalX = m_virtualOrigin.x() + screenX;
+    int globalY = m_virtualOrigin.y() + screenY;
+    POINT pt = { globalX, globalY };
+
+    struct WindowSearchContext {
+        POINT pt;
+        HWND foundHwnd = nullptr;
+        RECT foundRect = {};
+        QString title;
+        HWND webHwnd = nullptr;
+    } ctx;
+
+    ctx.pt = pt;
+    if (m_webViewWindow) ctx.webHwnd = m_webViewWindow->getHwnd();
+
+    // EnumWindows enumerates top-level windows in top-to-bottom Z-order
+    EnumWindows([](HWND hwnd, LPARAM lParam) -> BOOL {
+        WindowSearchContext* pCtx = reinterpret_cast<WindowSearchContext*>(lParam);
+        if (!IsWindowVisible(hwnd) || IsIconic(hwnd)) return TRUE;
+
+        // Skip our own web view
+        if (hwnd == pCtx->webHwnd) return TRUE;
+
+        LONG exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+        if (exStyle & WS_EX_TOOLWINDOW) return TRUE;
+
+        // Check if window is a layered/transparent utility overlay
+        char className[256] = { 0 };
+        GetClassNameA(hwnd, className, 256);
+        if (strstr(className, "Qt") || strstr(className, "Tool") || strstr(className, "Overlay")) {
+            if (exStyle & WS_EX_LAYERED) {
+                wchar_t testTitle[64] = { 0 };
+                GetWindowTextW(hwnd, testTitle, 64);
+                if (wcslen(testTitle) == 0) return TRUE;
+            }
+        }
+
+        // Get exact DWM frame bounds (including shadowless accurate geometry)
+        RECT rc = {};
+        HRESULT hr = DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &rc, sizeof(rc));
+        if (FAILED(hr) || rc.right <= rc.left || rc.bottom <= rc.top) {
+            GetWindowRect(hwnd, &rc);
+        }
+
+        if (PtInRect(&rc, pCtx->pt)) {
+            int w = rc.right - rc.left;
+            int h = rc.bottom - rc.top;
+
+            if (w >= 100 && h >= 80) {
+                wchar_t titleBuf[512] = { 0 };
+                GetWindowTextW(hwnd, titleBuf, 512);
+                QString titleStr = QString::fromWCharArray(titleBuf).trimmed();
+
+                pCtx->foundHwnd = hwnd;
+                pCtx->foundRect = rc;
+                pCtx->title = titleStr;
+                return FALSE; // Found topmost window under cursor!
+            }
+        }
+        return TRUE;
+    }, reinterpret_cast<LPARAM>(&ctx));
+
+    // Fallback to WindowFromPoint if EnumWindows didn't match
+    if (!ctx.foundHwnd) {
+        HWND hwnd = WindowFromPoint(pt);
+        if (hwnd) {
+            HWND root = GetAncestor(hwnd, GA_ROOT);
+            if (root && IsWindowVisible(root) && !IsIconic(root) && root != ctx.webHwnd) {
+                RECT rc = {};
+                HRESULT hr = DwmGetWindowAttribute(root, DWMWA_EXTENDED_FRAME_BOUNDS, &rc, sizeof(rc));
+                if (FAILED(hr)) GetWindowRect(root, &rc);
+
+                int w = rc.right - rc.left;
+                int h = rc.bottom - rc.top;
+                if (w >= 100 && h >= 80) {
+                    wchar_t titleBuf[512] = { 0 };
+                    GetWindowTextW(root, titleBuf, 512);
+                    ctx.foundHwnd = root;
+                    ctx.foundRect = rc;
+                    ctx.title = QString::fromWCharArray(titleBuf).trimmed();
+                }
+            }
+        }
+    }
+
+    if (ctx.foundHwnd) {
+        int localX = ctx.foundRect.left - m_virtualOrigin.x();
+        int localY = ctx.foundRect.top - m_virtualOrigin.y();
+        int localW = ctx.foundRect.right - ctx.foundRect.left;
+        int localH = ctx.foundRect.bottom - ctx.foundRect.top;
+
+        int virtW = m_fullScreenPixmap.width();
+        int virtH = m_fullScreenPixmap.height();
+        if (localX < 0) { localW += localX; localX = 0; }
+        if (localY < 0) { localH += localY; localY = 0; }
+        if (localX + localW > virtW) localW = virtW - localX;
+        if (localY + localH > virtH) localH = virtH - localY;
+
+        if (localW > 50 && localH > 50) {
+            result["found"] = true;
+            result["x"] = localX;
+            result["y"] = localY;
+            result["width"] = localW;
+            result["height"] = localH;
+            result["title"] = ctx.title.isEmpty() ? (isThai() ? "หน้าต่างแอปพลิเคชัน" : "Application Window") : ctx.title;
+        }
+    }
+
+    return result;
+}
+
 QRect AppManager::autoFitElementBounds(int rx, int ry, int rw, int rh) {
     if (m_fullScreenPixmap.isNull() || rw <= 5 || rh <= 5) {
         return QRect(rx, ry, rw, rh);

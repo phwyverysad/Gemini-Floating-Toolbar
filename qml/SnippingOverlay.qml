@@ -48,8 +48,9 @@ Window {
     }
 
     property var snapshotTimestamp: 0
-    property string captureMode: "freeform" // "freeform" | "smart"
+    property string captureMode: "freeform" // "freeform" | "window" | "smart"
     property rect smartRect: Qt.rect(0, 0, 0, 0)
+    property var hoveredWindow: ({ found: false, x: 0, y: 0, width: 0, height: 0, title: "" })
 
     // Left Mouse Drag (Freeform Selection)
     property bool isSelecting: false
@@ -148,10 +149,16 @@ Window {
         return fullLabel.trim();
     }
 
-    function toggleCaptureMode() {
+    function setCaptureMode(mode) {
         if (root.hasConfirmedSelection) return;
-        if (root.captureMode === "freeform") {
-            root.captureMode = "smart";
+        root.captureMode = mode;
+        if (mode === "window") {
+            root.smartRect = Qt.rect(0, 0, 0, 0);
+            if (root.mouseX > 0 && root.mouseY > 0) {
+                root.hoveredWindow = AppManager.detectWindowAt(root.mouseX, root.mouseY);
+            }
+        } else if (mode === "smart") {
+            root.hoveredWindow = ({ found: false, x: 0, y: 0, width: 0, height: 0, title: "" });
             if (root.mouseX > 0 && root.mouseY > 0) {
                 let detected = AppManager.detectElementBounds(root.mouseX, root.mouseY);
                 if (detected && detected.width > 4 && detected.height > 4) {
@@ -159,10 +166,21 @@ Window {
                 }
             }
         } else {
-            root.captureMode = "freeform";
             root.smartRect = Qt.rect(0, 0, 0, 0);
+            root.hoveredWindow = ({ found: false, x: 0, y: 0, width: 0, height: 0, title: "" });
         }
         crosshairCanvas.requestPaint();
+    }
+
+    function toggleCaptureMode() {
+        if (root.hasConfirmedSelection) return;
+        if (root.captureMode === "freeform") {
+            setCaptureMode("window");
+        } else if (root.captureMode === "window") {
+            setCaptureMode("smart");
+        } else {
+            setCaptureMode("freeform");
+        }
     }
 
     function resetSelection() {
@@ -380,6 +398,33 @@ Window {
                 visible: dimContainer.active && root.maskW > 0 && root.maskH > 0
                 x: root.maskX + root.maskW; y: root.maskY; width: Math.max(0, root.width - (root.maskX + root.maskW)); height: root.maskH
                 color: "#4d0f172a"
+            }
+        }
+
+        // 2.5 Window Snip Mode Highlight Rectangle (Indigo / Accent Blue)
+        Rectangle {
+            id: windowHighlightRect
+            visible: !root.hasConfirmedSelection && !root.isAnyDragging && root.captureMode === "window" && root.hoveredWindow.found && root.hoveredWindow.width > 20 && root.hoveredWindow.height > 20
+            x: root.hoveredWindow.x; y: root.hoveredWindow.y; width: root.hoveredWindow.width; height: root.hoveredWindow.height
+            color: "#182563eb"; border.color: "#2563eb"; border.width: 2; radius: 4; z: 82
+
+            Rectangle { width: 8; height: 8; radius: 4; x: -4; y: -4; color: "#ffffff"; border.color: "#2563eb"; border.width: 1.8 }
+            Rectangle { width: 8; height: 8; radius: 4; x: parent.width - 4; y: -4; color: "#ffffff"; border.color: "#2563eb"; border.width: 1.8 }
+            Rectangle { width: 8; height: 8; radius: 4; x: -4; y: parent.height - 4; color: "#ffffff"; border.color: "#2563eb"; border.width: 1.8 }
+            Rectangle { width: 8; height: 8; radius: 4; x: parent.width - 4; y: parent.height - 4; color: "#ffffff"; border.color: "#2563eb"; border.width: 1.8 }
+
+            Rectangle {
+                anchors.bottom: parent.top; anchors.bottomMargin: 8; anchors.horizontalCenter: parent.horizontalCenter
+                width: winBadgeRow.implicitWidth + 20; height: 26; radius: 13; color: "#ffffff"; border.color: "#2563eb"; border.width: 1.2; z: 90
+                Rectangle { anchors.fill: parent; anchors.margins: -1; radius: 14; color: "transparent"; border.color: "#200f172a"; border.width: 1; z: -1 }
+                Row {
+                    id: winBadgeRow; anchors.centerIn: parent; spacing: 6
+                    Rectangle { width: 7; height: 7; radius: 3.5; color: "#2563eb"; anchors.verticalCenter: parent.verticalCenter }
+                    Text {
+                        text: `${root.hoveredWindow.title ? (root.hoveredWindow.title + " | ") : ""}${root.hoveredWindow.width} × ${root.hoveredWindow.height} px | ${AppManager.isThai ? "คลิกเพื่อเลือกหน้าต่างนี้" : "Click to select window"}`
+                        font.family: Theme.fontFamily; font.pixelSize: 11; font.weight: Font.DemiBold; color: "#1d4ed8"; anchors.verticalCenter: parent.verticalCenter
+                    }
+                }
             }
         }
 
@@ -1037,19 +1082,30 @@ Window {
             z: 95
             Rectangle { anchors.fill: parent; anchors.margins: -1; radius: 20; color: "transparent"; border.color: "#180f172a"; border.width: 1; z: -1 }
             Row {
-                id: hintRow; anchors.centerIn: parent; spacing: 8
+                id: hintRow; anchors.centerIn: parent; spacing: 6
                 Rectangle {
                     width: freeformPillRow.implicitWidth + 16; height: 26; radius: 13; color: root.captureMode === "freeform" ? "#e0f2fe" : "#ffffff"; border.color: root.captureMode === "freeform" ? "#0284c7" : "#e2e8f0"; border.width: 1; anchors.verticalCenter: parent.verticalCenter
-                    Row { id: freeformPillRow; anchors.centerIn: parent; spacing: 5; Rectangle { width: 6; height: 6; radius: 3; color: root.captureMode === "freeform" ? "#0284c7" : "#94a3b8"; anchors.verticalCenter: parent.verticalCenter } Text { text: AppManager.isThai ? "แคปอิสระ [Alt]" : "Freeform [Alt]"; font.family: Theme.fontFamily; font.pixelSize: 11; font.weight: root.captureMode === "freeform" ? Font.Bold : Font.Medium; color: root.captureMode === "freeform" ? "#0369a1" : "#64748b"; anchors.verticalCenter: parent.verticalCenter } }
-                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { if (root.captureMode !== "freeform") root.toggleCaptureMode(); } }
+                    Row { id: freeformPillRow; anchors.centerIn: parent; spacing: 4; Rectangle { width: 6; height: 6; radius: 3; color: root.captureMode === "freeform" ? "#0284c7" : "#94a3b8"; anchors.verticalCenter: parent.verticalCenter } Text { text: AppManager.isThai ? "ลากเลือกพื้นที่" : "Area Snip"; font.family: Theme.fontFamily; font.pixelSize: 11; font.weight: root.captureMode === "freeform" ? Font.Bold : Font.Medium; color: root.captureMode === "freeform" ? "#0369a1" : "#64748b"; anchors.verticalCenter: parent.verticalCenter } }
+                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { root.setCaptureMode("freeform"); } }
+                }
+                Rectangle {
+                    width: windowPillRow.implicitWidth + 16; height: 26; radius: 13; color: root.captureMode === "window" ? "#dbeafe" : "#ffffff"; border.color: root.captureMode === "window" ? "#2563eb" : "#e2e8f0"; border.width: 1; anchors.verticalCenter: parent.verticalCenter
+                    Row { id: windowPillRow; anchors.centerIn: parent; spacing: 4; Rectangle { width: 6; height: 6; radius: 3; color: root.captureMode === "window" ? "#2563eb" : "#94a3b8"; anchors.verticalCenter: parent.verticalCenter } Text { text: AppManager.isThai ? "แคปหน้าต่างแอพ" : "Window Snip"; font.family: Theme.fontFamily; font.pixelSize: 11; font.weight: root.captureMode === "window" ? Font.Bold : Font.Medium; color: root.captureMode === "window" ? "#1d4ed8" : "#64748b"; anchors.verticalCenter: parent.verticalCenter } }
+                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { root.setCaptureMode("window"); } }
                 }
                 Rectangle {
                     width: smartPillRow.implicitWidth + 16; height: 26; radius: 13; color: root.captureMode === "smart" ? "#ede9fe" : "#ffffff"; border.color: root.captureMode === "smart" ? "#8b5cf6" : "#e2e8f0"; border.width: 1; anchors.verticalCenter: parent.verticalCenter
-                    Row { id: smartPillRow; anchors.centerIn: parent; spacing: 5; Rectangle { width: 6; height: 6; radius: 3; color: root.captureMode === "smart" ? "#8b5cf6" : "#94a3b8"; anchors.verticalCenter: parent.verticalCenter } Text { text: AppManager.isThai ? "ตรวจจับโครงสร้าง [Alt]" : "Smart Detect [Alt]"; font.family: Theme.fontFamily; font.pixelSize: 11; font.weight: root.captureMode === "smart" ? Font.Bold : Font.Medium; color: root.captureMode === "smart" ? "#6d28d9" : "#64748b"; anchors.verticalCenter: parent.verticalCenter } }
-                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { if (root.captureMode !== "smart") root.toggleCaptureMode(); } }
+                    Row { id: smartPillRow; anchors.centerIn: parent; spacing: 4; Rectangle { width: 6; height: 6; radius: 3; color: root.captureMode === "smart" ? "#8b5cf6" : "#94a3b8"; anchors.verticalCenter: parent.verticalCenter } Text { text: AppManager.isThai ? "ตรวจจับโครงสร้าง" : "Smart Detect"; font.family: Theme.fontFamily; font.pixelSize: 11; font.weight: root.captureMode === "smart" ? Font.Bold : Font.Medium; color: root.captureMode === "smart" ? "#6d28d9" : "#64748b"; anchors.verticalCenter: parent.verticalCenter } }
+                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { root.setCaptureMode("smart"); } }
                 }
                 Rectangle { width: 1; height: 16; color: "#e2e8f0"; anchors.verticalCenter: parent.verticalCenter }
-                Text { anchors.verticalCenter: parent.verticalCenter; text: root.captureMode === "smart" ? (AppManager.isThai ? "คลิกโครงสร้างเพื่อเลือก | [Esc] ยกเลิก" : "Click structure to snap | [Esc] Cancel") : (AppManager.isThai ? "ลากเพื่อครอบตัด | [Esc] ยกเลิก" : "Drag to crop | [Esc] Cancel"); font.family: Theme.fontFamily; font.pixelSize: 11; font.weight: Font.Normal; color: "#64748b" }
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: root.captureMode === "window" ? (AppManager.isThai ? "คลิกที่หน้าต่างเพื่อเลือก | [Alt/Tab] สลับโหมด | [Esc] ยกเลิก" : "Click window to snap | [Alt/Tab] Switch mode | [Esc] Cancel") :
+                          (root.captureMode === "smart" ? (AppManager.isThai ? "คลิกโครงสร้างเพื่อเลือก | [Alt/Tab] สลับโหมด | [Esc] ยกเลิก" : "Click element to snap | [Alt/Tab] Switch mode | [Esc] Cancel") :
+                          (AppManager.isThai ? "ลากเพื่อครอบตัด | [Alt/Tab] สลับโหมด | [Esc] ยกเลิก" : "Drag to crop | [Alt/Tab] Switch mode | [Esc] Cancel"))
+                    font.family: Theme.fontFamily; font.pixelSize: 11; font.weight: Font.Normal; color: "#64748b"
+                }
             }
         }
 
@@ -1065,7 +1121,7 @@ Window {
                 let mx = root.mouseX; let my = root.mouseY; let size = 12; let gap = 4;
                 ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1.5; ctx.beginPath();
                 ctx.moveTo(mx - size, my); ctx.lineTo(mx - gap, my); ctx.moveTo(mx + gap, my); ctx.lineTo(mx + size, my); ctx.moveTo(mx, my - size); ctx.lineTo(mx, my - gap); ctx.moveTo(mx, my + gap); ctx.lineTo(mx, my + size); ctx.stroke();
-                ctx.beginPath(); ctx.arc(mx, my, 2, 0, Math.PI * 2); ctx.fillStyle = root.isRightSelecting ? "#06b6d4" : (root.captureMode === "smart" ? "#8b5cf6" : "#0284c7"); ctx.fill();
+                ctx.beginPath(); ctx.arc(mx, my, 2, 0, Math.PI * 2); ctx.fillStyle = root.isRightSelecting ? "#06b6d4" : (root.captureMode === "window" ? "#2563eb" : (root.captureMode === "smart" ? "#8b5cf6" : "#0284c7")); ctx.fill();
             }
         }
 
@@ -1074,12 +1130,16 @@ Window {
             id: bgMouseArea
             anchors.fill: parent
             hoverEnabled: true
-            cursorShape: root.hasConfirmedSelection ? Qt.ArrowCursor : Qt.BlankCursor
+            cursorShape: root.hasConfirmedSelection ? Qt.ArrowCursor : (root.captureMode === "window" && root.hoveredWindow.found ? Qt.PointingHandCursor : Qt.BlankCursor)
             acceptedButtons: Qt.LeftButton | Qt.RightButton
             z: 10
 
             onPressed: function(mouse) {
                 if (mouse.button === Qt.LeftButton) {
+                    if (!root.hasConfirmedSelection && root.captureMode === "window" && root.hoveredWindow.found && root.hoveredWindow.width > 20 && root.hoveredWindow.height > 20) {
+                        root.commitSelection(root.hoveredWindow.x, root.hoveredWindow.y, root.hoveredWindow.width, root.hoveredWindow.height);
+                        return;
+                    }
                     if (!root.hasConfirmedSelection && root.captureMode === "smart" && root.smartRect.width > 4 && root.smartRect.height > 4) {
                         root.commitSelection(root.smartRect.x, root.smartRect.y, root.smartRect.width, root.smartRect.height);
                         return;
@@ -1097,6 +1157,14 @@ Window {
                 root.mouseX = mouse.x; root.mouseY = mouse.y;
                 if (root.isSelecting) { root.currentX = mouse.x; root.currentY = mouse.y; }
                 else if (root.isRightSelecting) { root.rightCurrentX = mouse.x; root.rightCurrentY = mouse.y; }
+                else if (!root.hasConfirmedSelection && root.captureMode === "window") {
+                    let win = AppManager.detectWindowAt(mouse.x, mouse.y);
+                    if (win && win.found) {
+                        root.hoveredWindow = win;
+                    } else {
+                        root.hoveredWindow = ({ found: false, x: 0, y: 0, width: 0, height: 0, title: "" });
+                    }
+                }
                 else if (!root.hasConfirmedSelection && root.captureMode === "smart") {
                     let detected = AppManager.detectElementBounds(mouse.x, mouse.y);
                     if (detected && detected.width > 4 && detected.height > 4) { root.smartRect = detected; }

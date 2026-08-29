@@ -340,23 +340,69 @@ void WebViewWindow::injectPromptAndImage(const QString& base64Image, const QStri
         return true;
     }
 
-    function hasAttachedFile() {
-        return !!document.querySelector(
-            'img[src^="blob:"], img[src^="data:"], img.thumbnail, .image-preview, .uploader-preview, ' +
-            'mat-chip, .attachment-card, .file-preview, [aria-label*="Delete image"], [aria-label*="ลบรูปภาพ"], ' +
-            '[aria-label*="Remove"], [aria-label*="Delete"], button[mattooltip*="Delete"], button[mattooltip*="Remove"]'
-        );
+    function hasAttachedFile(inputEl) {
+        // Scoped check inside or near the input container first
+        const container = (inputEl ? (inputEl.closest('rich-textarea, .input-area, .chat-input, .text-input-field, form, .input-container, .bottom-container') || inputEl.parentElement) : null);
+        const searchScope = container || document;
+
+        const attachmentSelectors = [
+            '.attachment-card',
+            '.attachment-container',
+            '.file-preview',
+            '.image-preview',
+            '.uploader-preview',
+            'img.thumbnail',
+            'img[src^="blob:"]',
+            'img[src^="data:image"]',
+            '[aria-label*="Delete image" i]',
+            '[aria-label*="ลบรูปภาพ" i]',
+            '[aria-label*="Remove file" i]',
+            '[aria-label*="Remove attachment" i]',
+            '[aria-label*="Delete attachment" i]',
+            'button[mattooltip*="Delete" i]',
+            'button[mattooltip*="Remove" i]',
+            'button[mattooltip*="ลบ" i]',
+            'mat-chip[role="option"]',
+            '.file-bubble'
+        ];
+
+        for (const sel of attachmentSelectors) {
+            const found = searchScope.querySelector(sel);
+            if (found && found.offsetParent !== null) return true;
+        }
+
+        // Global fallback if container wasn't identified
+        if (container) {
+            for (const sel of attachmentSelectors) {
+                const found = document.querySelector(sel);
+                if (found && found.offsetParent !== null) return true;
+            }
+        }
+        return false;
     }
 
-    function isUploading() {
-        // Specific progress spinners inside attachment cards or input area
-        return !!document.querySelector(
-            '.attachment-card mat-progress-spinner, .attachment-card mat-spinner, ' +
-            '.image-preview mat-progress-spinner, .image-preview mat-spinner, ' +
-            'rich-textarea mat-progress-spinner, rich-textarea mat-spinner, ' +
-            '.input-area mat-progress-spinner, .input-area mat-spinner, ' +
-            '.attachment-card .loading, .attachment-card .uploading'
-        );
+    function isUploading(inputEl) {
+        const container = (inputEl ? (inputEl.closest('rich-textarea, .input-area, .chat-input, .text-input-field, form, .input-container, .bottom-container') || inputEl.parentElement) : null);
+        const searchScope = container || document;
+
+        const spinnerSelectors = [
+            'mat-progress-spinner',
+            'mat-spinner',
+            '.mat-mdc-progress-spinner',
+            '.attachment-card .loading',
+            '.attachment-card .uploading',
+            '.image-preview .loading',
+            '.image-preview .uploading',
+            '.uploader-preview .loading',
+            '.spinner',
+            '[role="progressbar"]'
+        ];
+
+        for (const sel of spinnerSelectors) {
+            const found = searchScope.querySelector(sel);
+            if (found && found.offsetParent !== null) return true;
+        }
+        return false;
     }
 
     function isSendButton(btn) {
@@ -464,8 +510,9 @@ void WebViewWindow::injectPromptAndImage(const QString& base64Image, const QStri
         if (!shouldSubmit) return;
 
         let pollCount = 0;
-        const maxPoll = hasFile ? 240 : 80; // 6.0s for image attachment, 2.0s for text
+        const maxPoll = hasFile ? 400 : 80; // 10.0s for image attachment, 2.0s for text
         let sent = false;
+        let hasSeenAttachment = false;
 
         function doSend() {
             if (sent) return true;
@@ -473,7 +520,7 @@ void WebViewWindow::injectPromptAndImage(const QString& base64Image, const QStri
             if (runBtn) {
                 sent = true;
                 runBtn.click();
-                setTimeout(() => { pressEnterKey(el); }, 60);
+                setTimeout(() => { pressEnterKey(el); }, 80);
                 return true;
             } else if (el) {
                 sent = true;
@@ -490,10 +537,15 @@ void WebViewWindow::injectPromptAndImage(const QString& base64Image, const QStri
             const isBtnEnabled = runBtn && !runBtn.disabled && runBtn.getAttribute('aria-disabled') !== 'true';
 
             if (hasFile) {
-                const fileInDom = hasAttachedFile();
-                const uploading = isUploading();
+                const fileInDom = hasAttachedFile(el);
+                const uploading = isUploading(el);
 
-                if (fileInDom && isBtnEnabled && !uploading) {
+                if (fileInDom) {
+                    hasSeenAttachment = true;
+                }
+
+                // Strictly require that the attachment card is present, no upload spinner is active, and send button is enabled
+                if (hasSeenAttachment && fileInDom && !uploading && isBtnEnabled) {
                     return doSend();
                 }
             } else {
@@ -504,7 +556,7 @@ void WebViewWindow::injectPromptAndImage(const QString& base64Image, const QStri
             return false;
         }
 
-        // Try instant send if ready
+        // Try instant send if ready (only for text-only, or if image was instantly parsed)
         if (checkAndSend()) return;
 
         // High-frequency 25ms polling for instant response
@@ -516,7 +568,10 @@ void WebViewWindow::injectPromptAndImage(const QString& base64Image, const QStri
                 if (observer) observer.disconnect();
 
                 if (!sent && pollCount >= maxPoll) {
-                    doSend();
+                    // Only send on timeout if not an image upload, or if image attachment is confirmed ready
+                    if (!hasFile || (hasSeenAttachment && !isUploading(el))) {
+                        doSend();
+                    }
                 }
             }
         }, 25);
