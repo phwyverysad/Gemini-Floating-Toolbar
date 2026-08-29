@@ -33,8 +33,6 @@ class AppManager : public QObject {
     Q_PROPERTY(QVariantList textPrompts READ textPrompts NOTIFY settingsChanged)
     Q_PROPERTY(QVariantList customAskPrompts READ customAskPrompts NOTIFY settingsChanged)
     Q_PROPERTY(QVariantList categories READ categories NOTIFY settingsChanged)
-    Q_PROPERTY(bool autoRun READ autoRun NOTIFY settingsChanged)
-    Q_PROPERTY(bool startWithWindows READ startWithWindows NOTIFY settingsChanged)
 
 public:
     static AppManager* instance();
@@ -51,8 +49,6 @@ public:
     QVariantList textPrompts() const { return m_textPrompts; }
     QVariantList customAskPrompts() const { return m_customAskPrompts; }
     QVariantList categories() const { return m_categories; }
-    bool autoRun() const { return m_autoRun; }
-    bool startWithWindows() const { return m_startWithWindows; }
 
     void setWebViewWindow(WebViewWindow* webView) { m_webViewWindow = webView; }
 
@@ -82,17 +78,19 @@ public:
     Q_INVOKABLE qint64 getSnapshotTimestamp() const { return m_snapshotTimestamp; }
     Q_INVOKABLE QRect getVirtualDesktopGeometry();
 
-    // OCR Text Recognition Methods
-    Q_INVOKABLE QString performOcr(int x, int y, int w, int h, const QString& lang = "tha+eng");
-    Q_INVOKABLE void copyTextToClipboard(const QString& text);
-    Q_INVOKABLE bool isOcrAvailable() const;
-    Q_INVOKABLE QStringList availableOcrLanguages() const;
-
     // UI Window Navigation (Invokable from QML / Tray)
     Q_INVOKABLE void showSettingsDialog();
     Q_INVOKABLE void hideSettingsDialog();
     Q_INVOKABLE void toggleMainWindow();
     Q_INVOKABLE void exitApp();
+
+    // Text OCR Operations (Invokable from QML)
+    Q_INVOKABLE QString performOcr(int x, int y, int w, int h, const QString& lang = "auto");
+    Q_INVOKABLE void captureAndOcr(int x, int y, int w, int h, const QString& lang = "auto");
+    Q_INVOKABLE void copyOcrText(const QString& text);
+    Q_INVOKABLE void triggerOcrPrompt(const QString& prompt, const QString& extractedText);
+    Q_INVOKABLE bool isOcrAvailable();
+    Q_INVOKABLE QStringList getOcrLanguages();
 
     // Hotkey Management
     void registerGlobalHotkeys(HWND hWnd);
@@ -120,6 +118,8 @@ signals:
     void requestShowSettings();
     void requestTriggerToolbarAction(int visualIndex);
     void requestOpenCustomAsk();
+    void ocrCompleted(const QString& text, int x, int y, int w, int h);
+    void ocrFailed(const QString& error);
 
 private:
     void loadSettingsFromFile();

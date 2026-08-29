@@ -120,16 +120,6 @@ int main(int argc, char* argv[]) {
     if (snippingOverlayObj) {
         QObject::connect(appManager, &AppManager::requestShowSnipping, snippingOverlayObj, [snippingOverlayObj]() {
             QMetaObject::invokeMethod(snippingOverlayObj, "startSnipping");
-            if (QQuickWindow* win = qobject_cast<QQuickWindow*>(snippingOverlayObj)) {
-                win->show();
-                win->raise();
-                win->requestActivate();
-                HWND hwnd = (HWND)win->winId();
-                if (hwnd) {
-                    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
-                    SetForegroundWindow(hwnd);
-                }
-            }
         });
     }
 

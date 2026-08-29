@@ -15,16 +15,13 @@ DEFINES += UNICODE _UNICODE NDEBUG
 
 INCLUDEPATH += \
     $$PWD/packages/WebView2/build/native/include \
-    $$PWD/packages/tesseract/include \
     $$PWD/resources \
     $$PWD/src
 
 LIBS += \
     -L$$PWD/packages/WebView2/build/native/x64 \
     -lWebView2LoaderStatic \
-    -L$$PWD/packages/tesseract/lib \
-    -ltesseract52 -lleptonica-1.82.0 \
-    -lshell32 -luser32 -lgdi32 -ladvapi32 -lole32 -loleaut32 -lshlwapi -ldwmapi
+    -lshell32 -luser32 -lgdi32 -ladvapi32 -lole32 -loleaut32 -lshlwapi -ldwmapi -lwindowsapp
 
 HEADERS += \
     src/AppManager.h \

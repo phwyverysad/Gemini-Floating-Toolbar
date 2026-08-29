@@ -138,8 +138,6 @@ Item {
                     keyStr = "Left";
                 } else if (event.key === Qt.Key_Right) {
                     keyStr = "Right";
-                } else if (vk >= 0x60 && vk <= 0x69) {
-                    keyStr = "Num " + (vk - 0x60);
                 }
 
                 if (keyStr.length > 0) {

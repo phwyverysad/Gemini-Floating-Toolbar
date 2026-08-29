@@ -383,16 +383,6 @@ void AppManager::handleGlobalHotkey(int hotkeyId) {
 }
 
 QRect AppManager::getVirtualDesktopGeometry() {
-    QList<QScreen*> screens = QGuiApplication::screens();
-    if (!screens.isEmpty()) {
-        QRect virtualGeo;
-        for (QScreen* s : screens) {
-            virtualGeo = virtualGeo.united(s->geometry());
-        }
-        if (!virtualGeo.isEmpty() && virtualGeo.width() > 100 && virtualGeo.height() > 100) {
-            return virtualGeo;
-        }
-    }
     int vx = GetSystemMetrics(SM_XVIRTUALSCREEN);
     int vy = GetSystemMetrics(SM_YVIRTUALSCREEN);
     int vw = GetSystemMetrics(SM_CXVIRTUALSCREEN);
@@ -469,35 +459,40 @@ void AppManager::startSnipping() {
 
     if (m_webViewWasVisible) {
         QCoreApplication::processEvents();
-        QThread::msleep(25);
+        QThread::msleep(20);
         QCoreApplication::processEvents();
     } else {
         QCoreApplication::processEvents();
     }
 
-    // 3. Robust Multi-Monitor Screenshot Capture with high-DPI precision
-    QList<QScreen*> screens = QGuiApplication::screens();
-    if (screens.size() == 1) {
-        m_fullScreenPixmap = screens.first()->grabWindow(0);
-    } else if (screens.size() > 1) {
-        QRect virtualGeo = getVirtualDesktopGeometry();
-        QImage compositeImage(virtualGeo.size(), QImage::Format_RGB32);
-        compositeImage.fill(Qt::black);
-        QPainter painter(&compositeImage);
-        for (QScreen* s : screens) {
-            QPixmap screenPix = s->grabWindow(0);
-            int targetX = s->geometry().x() - virtualGeo.x();
-            int targetY = s->geometry().y() - virtualGeo.y();
-            painter.drawPixmap(targetX, targetY, s->geometry().width(), s->geometry().height(), screenPix);
-        }
-        painter.end();
-        m_fullScreenPixmap = QPixmap::fromImage(compositeImage);
-    } else {
-        m_fullScreenPixmap = captureNativeDesktop();
-    }
+    // 3. Capture native GDI desktop across all monitors (Format_RGB32)
+    m_fullScreenPixmap = captureNativeDesktop();
 
     if (m_fullScreenPixmap.isNull() || m_fullScreenPixmap.width() < 50 || m_fullScreenPixmap.height() < 50) {
-        m_fullScreenPixmap = captureNativeDesktop();
+        // Fallback to Qt Screen Grab with Format_RGB32
+        QList<QScreen*> screens = QGuiApplication::screens();
+        if (screens.isEmpty()) {
+            QScreen* screen = QGuiApplication::primaryScreen();
+            if (screen) {
+                m_fullScreenPixmap = screen->grabWindow(0);
+            }
+        } else {
+            QRect virtualGeo;
+            for (QScreen* s : screens) {
+                virtualGeo = virtualGeo.united(s->geometry());
+            }
+            QImage compositeImage(virtualGeo.size(), QImage::Format_RGB32);
+            compositeImage.fill(Qt::black);
+            QPainter painter(&compositeImage);
+            for (QScreen* s : screens) {
+                QPixmap screenPix = s->grabWindow(0);
+                int targetX = s->geometry().x() - virtualGeo.x();
+                int targetY = s->geometry().y() - virtualGeo.y();
+                painter.drawPixmap(targetX, targetY, s->geometry().width(), s->geometry().height(), screenPix);
+            }
+            painter.end();
+            m_fullScreenPixmap = QPixmap::fromImage(compositeImage);
+        }
     }
 
     m_virtualOrigin = getVirtualDesktopGeometry().topLeft();
@@ -1433,10 +1428,7 @@ void AppManager::processScreenCrop(int x, int y, int w, int h) {
 }
 
 void AppManager::captureAndCopy(int x, int y, int w, int h) {
-    if (w <= 2 || h <= 2) return;
-    if (m_fullScreenPixmap.isNull()) {
-        m_fullScreenPixmap = SnapshotImageProvider::instance()->getSnapshot();
-    }
+    if (w <= 5 || h <= 5) return;
     if (m_fullScreenPixmap.isNull()) return;
 
     int px = qBound(0, x, m_fullScreenPixmap.width());
@@ -1447,6 +1439,7 @@ void AppManager::captureAndCopy(int x, int y, int w, int h) {
     if (pw <= 0 || ph <= 0) return;
 
     QPixmap cropped = m_fullScreenPixmap.copy(px, py, pw, ph);
+    m_fullScreenPixmap = QPixmap();
 
     QClipboard* clipboard = QGuiApplication::clipboard();
     if (clipboard) {
@@ -1455,10 +1448,7 @@ void AppManager::captureAndCopy(int x, int y, int w, int h) {
 }
 
 void AppManager::captureAndTriggerAction(int x, int y, int w, int h, int promptIndex) {
-    if (w <= 2 || h <= 2) return;
-    if (m_fullScreenPixmap.isNull()) {
-        m_fullScreenPixmap = SnapshotImageProvider::instance()->getSnapshot();
-    }
+    if (w <= 5 || h <= 5) return;
     if (m_fullScreenPixmap.isNull()) return;
 
     int px = qBound(0, x, m_fullScreenPixmap.width());
@@ -1469,6 +1459,7 @@ void AppManager::captureAndTriggerAction(int x, int y, int w, int h, int promptI
     if (pw <= 0 || ph <= 0) return;
 
     QPixmap cropped = m_fullScreenPixmap.copy(px, py, pw, ph);
+    m_fullScreenPixmap = QPixmap();
 
     QClipboard* clipboard = QGuiApplication::clipboard();
     if (clipboard) {
@@ -1516,40 +1507,6 @@ void AppManager::captureAndTriggerCustomPrompt(int x, int y, int w, int h, const
     m_activeSelectedText.clear();
 
     triggerCustomPrompt(customPrompt, "image", autoRun);
-}
-
-QString AppManager::performOcr(int x, int y, int w, int h, const QString& lang) {
-    if (w <= 2 || h <= 2) return QString();
-    if (m_fullScreenPixmap.isNull()) {
-        m_fullScreenPixmap = SnapshotImageProvider::instance()->getSnapshot();
-    }
-    if (m_fullScreenPixmap.isNull()) return QString();
-
-    int px = qBound(0, x, m_fullScreenPixmap.width());
-    int py = qBound(0, y, m_fullScreenPixmap.height());
-    int pw = qMin(w, m_fullScreenPixmap.width() - px);
-    int ph = qMin(h, m_fullScreenPixmap.height() - py);
-
-    if (pw <= 0 || ph <= 0) return QString();
-
-    QPixmap cropped = m_fullScreenPixmap.copy(px, py, pw, ph);
-    QString recognized = OcrEngine::instance()->recognizeText(cropped, lang);
-    return recognized;
-}
-
-void AppManager::copyTextToClipboard(const QString& text) {
-    QClipboard* clipboard = QGuiApplication::clipboard();
-    if (clipboard) {
-        clipboard->setText(text);
-    }
-}
-
-bool AppManager::isOcrAvailable() const {
-    return OcrEngine::instance()->isAvailable();
-}
-
-QStringList AppManager::availableOcrLanguages() const {
-    return OcrEngine::instance()->availableLanguages();
 }
 
 void AppManager::exitApp() {
@@ -1640,7 +1597,6 @@ void AppManager::cancelAction() {
     removeToolbarKeyboardHook();
     m_activeBase64Image.clear();
     m_activeSelectedText.clear();
-    m_fullScreenPixmap = QPixmap();
     if (m_webViewWasVisible && m_webViewWindow) {
         m_webViewWindow->restoreAndShow();
         m_webViewWasVisible = false;
@@ -1659,3 +1615,70 @@ void AppManager::toggleMainWindow() {
         m_webViewWindow->toggle();
     }
 }
+
+QString AppManager::performOcr(int x, int y, int w, int h, const QString& lang) {
+    if (w <= 2 || h <= 2) return QString();
+    if (m_fullScreenPixmap.isNull()) {
+        m_fullScreenPixmap = SnapshotImageProvider::instance()->getSnapshot();
+    }
+    if (m_fullScreenPixmap.isNull()) return QString();
+
+    int px = qBound(0, x, m_fullScreenPixmap.width());
+    int py = qBound(0, y, m_fullScreenPixmap.height());
+    int pw = qMin(w, m_fullScreenPixmap.width() - px);
+    int ph = qMin(h, m_fullScreenPixmap.height() - py);
+
+    if (pw <= 0 || ph <= 0) return QString();
+
+    QImage cropped = m_fullScreenPixmap.copy(px, py, pw, ph).toImage();
+    QString text = TextScanner::instance().recognizeImage(cropped, lang);
+    return text;
+}
+
+void AppManager::captureAndOcr(int x, int y, int w, int h, const QString& lang) {
+    QString text = performOcr(x, y, w, h, lang);
+    if (!text.isEmpty()) {
+        emit ocrCompleted(text, x, y, w, h);
+    } else {
+        emit ocrFailed(isThai() ? QString::fromUtf8("ไม่พบข้อความในพื้นที่ที่เลือก") : "No text recognized in selected area");
+    }
+}
+
+void AppManager::copyOcrText(const QString& text) {
+    if (text.isEmpty()) return;
+    QClipboard* clipboard = QGuiApplication::clipboard();
+    if (clipboard) {
+        clipboard->setText(text);
+    }
+}
+
+void AppManager::triggerOcrPrompt(const QString& prompt, const QString& extractedText) {
+    if (extractedText.isEmpty()) return;
+    removeToolbarKeyboardHook();
+    m_activeBase64Image.clear();
+    m_activeSelectedText = extractedText;
+
+    QString finalPrompt = prompt;
+    if (finalPrompt.isEmpty()) {
+        finalPrompt = extractedText;
+    } else {
+        if (!finalPrompt.contains("{text}")) {
+            finalPrompt = finalPrompt.trimmed() + "\n\n" + extractedText;
+        } else {
+            finalPrompt = finalPrompt.replace("{text}", extractedText);
+        }
+    }
+
+    if (m_webViewWindow) {
+        m_webViewWindow->injectPromptAndImage("", finalPrompt, m_autoRun);
+    }
+}
+
+bool AppManager::isOcrAvailable() {
+    return TextScanner::instance().isAvailable();
+}
+
+QStringList AppManager::getOcrLanguages() {
+    return TextScanner::instance().getAvailableLanguages();
+}
+

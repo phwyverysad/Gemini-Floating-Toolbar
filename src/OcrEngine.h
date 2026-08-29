@@ -1,30 +1,32 @@
-﻿#pragma once
+#pragma once
 
-#include <QObject>
 #include <QString>
-#include <QStringList>
 #include <QImage>
-#include <QPixmap>
+#include <QObject>
+#include <QStringList>
 
-class OcrEngine : public QObject {
+class TextScanner : public QObject {
     Q_OBJECT
 public:
-    static OcrEngine* instance();
+    static TextScanner& instance();
 
-    // Recognize text from image (default: "tha+eng")
-    QString recognizeText(const QImage& image, const QString& languages = "tha+eng");
-    QString recognizeText(const QPixmap& pixmap, const QString& languages = "tha+eng");
+    // Performs OCR on a QImage synchronously
+    QString recognizeImage(const QImage& image, const QString& preferredLang = "auto");
 
-    // Availability and language inspection
+    // Check if OCR is available on this system
     bool isAvailable() const;
-    QStringList availableLanguages() const;
-    QString tessdataPath() const { return m_tessdataPath; }
+
+    // Get list of supported/installed OCR languages
+    QStringList getAvailableLanguages() const;
 
 private:
-    explicit OcrEngine(QObject* parent = nullptr);
-    ~OcrEngine();
+    TextScanner();
+    ~TextScanner() override = default;
 
-    QString findTessdataPath() const;
+    QString recognizeWithWindowsMediaOcr(const QImage& image, const QString& lang);
+    QString recognizeWithTesseract(const QImage& image, const QString& lang);
+    QString findTesseractPath() const;
 
-    QString m_tessdataPath;
+    bool m_winMediaOcrAvailable = false;
 };
+
